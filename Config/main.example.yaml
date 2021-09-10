@@ -1,0 +1,13 @@
+server:
+  host: localhost
+  port: 8080
+  run_state: false
+client:
+  default_connection_timeout: 30
+  default_execution_timeout: 30
+queue:
+  name: Default
+  default_delay: 0
+  default_attemts: 5
+  default_attempt_delay: 30
+  default_lifetime: 180
