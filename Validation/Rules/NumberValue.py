@@ -2,7 +2,7 @@ import re
 from Exceptions import ValidationException
 
 
-def number(field, key) -> int:
+def number(field, key: str) -> int:
     type_name = type(field)
 
     if type_name == int:

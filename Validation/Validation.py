@@ -7,7 +7,7 @@ import re
 
 
 class Validator:
-    def exec(self, data, rules) -> dict:
+    def exec(self, data: dict, rules: dict) -> dict:
         result = {}
 
         if not isinstance(data, dict) or not isinstance(rules, dict):

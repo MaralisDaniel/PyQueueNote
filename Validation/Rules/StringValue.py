@@ -1,7 +1,7 @@
 from Exceptions import ValidationException
 
 
-def string(field, key) -> str:
+def string(field, key: str) -> str:
     field_type = type(field)
 
     if field_type == str and not ("\n" in field):

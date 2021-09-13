@@ -2,7 +2,7 @@ from Exceptions import ValidationException
 import re
 
 
-def regex(field, key, regular) -> str:
+def regex(field, key: str, regular: str) -> str:
     field = str(field).strip()
     reg = re.match(r'^/(?P<pattern>.+)(/$)?(?(2)|/(?P<mods>[mixLusa]+))$', regular)
 
