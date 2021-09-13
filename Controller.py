@@ -3,21 +3,27 @@ from Exceptions import ValidationException
 
 
 class Controller:
-    def __init__(self, validator):
-        self.validator = validator
+    __validator = None
+    __v_collection = None
+
+    def __init__(self, validator, v_collection):
+        self.__validator = validator
+        self.__v_collection = v_collection
 
     async def send_message(self, request):
         try:
             data = {'channel': request.match_info['channel'], **(await self.__get_data(request, ('message', 'delay')))}
 
-            valid_data = self.validator.exec(data, {'channel': 'required|string', 'delay': 'nullable|number'})
+            valid_data = self.__validator.exec(data, {'channel': 'required|string', 'delay': 'nullable|number'})
 
-            # TODO mock for worker regex - change it after worker implements
-            mock = '/[\\wа-я\\s]+/iu'
+            if not self.__v_collection.is_channel(valid_data['channel']):
+                raise ValidationException(f"Virtual channel {valid_data['channel']} is not registered in service")
 
-            valid_data['message'] = self.validator.exec(data, {'message': 'required|regex:' + mock})
+            message_pattern = self.__v_collection.get_pattern(valid_data['channel'])
 
-            # TODO put task in queue
+            valid_data.update(self.__validator.exec(data, {'message': f'required|regex:{message_pattern}'}))
+
+            self.__v_collection.add_task(valid_data['channel'], valid_data['message'])
 
             return web.Response(status=204, content_type='')
         except ValidationException as e:

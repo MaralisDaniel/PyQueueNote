@@ -2,6 +2,7 @@ server:
   host: localhost
   port: 8080
   run_state: false
+  debug: false
 client:
   default_connection_timeout: 30
   default_execution_timeout: 30

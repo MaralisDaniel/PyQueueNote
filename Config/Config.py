@@ -1,5 +1,6 @@
 import yaml
 import os
+import re
 
 
 class Config:
@@ -27,7 +28,7 @@ class Config:
         return os.path.abspath(os.path.join(self.__root_dir, path))
 
     def read_v_channel_configs(self) -> None:
-        self.__config['v-channels'] = {}
+        self.__config['v-channels'] = {'stub': {'minDelay': 1, 'maxDelay': 5}}
 
         # TODO stubbing virtual channels config reading
 
@@ -36,6 +37,16 @@ class Config:
 
         if path in self.__flatten_config:
             return self.__flatten_config[path]
+        elif '*' in path:
+            params = {}
+
+            path = re.compile(path.replace('*', '[\\w\\-]+').replace('.', '\\.'), re.I | re.U)
+
+            for key in self.__flatten_config.keys():
+                if path.fullmatch(key):
+                    params[key] = self.__flatten_config[key]
+
+            return params
         else:
             return default
 

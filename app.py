@@ -1,11 +1,12 @@
 from aiohttp import web
 from Controller import Controller
 from Validation import Validator
+from Service import VCollection
 from Config import Config
 
 app = web.Application()
 config = Config()
-controller = Controller(Validator())
+controller = Controller(Validator(), VCollection(config.get_raw()['v-channels']))
 
 app['config'] = config
 
