@@ -6,11 +6,11 @@ class Controller:
     __validator = None
     __v_collection = None
 
-    def __init__(self, validator, v_collection):
+    def __init__(self, validator, v_collection) -> None:
         self.__validator = validator
         self.__v_collection = v_collection
 
-    async def send_message(self, request):
+    async def send_message(self, request: web.Request) -> web.Response:
         try:
             data = {'channel': request.match_info['channel'], **(await self.__get_data(request, ('message', 'delay')))}
 
@@ -31,7 +31,7 @@ class Controller:
         except Exception as e:
             return web.json_response({'error': str(e)}, status=500)
 
-    async def ping(self, request) -> web.Response:
+    async def ping(self, request: web.Request) -> web.Response:
         response = web.Response(content_type='plain/text', charset='utf-8')
 
         # TODO: for first steps it will return only OK status, after adding maintenance mode - modify it
@@ -41,7 +41,7 @@ class Controller:
 
         return response
 
-    async def __get_data(self, request, keys=()):
+    async def __get_data(self, request: web.Request, keys=()) -> dict:
         result = {}
 
         if request.body_exists and request.can_read_body:

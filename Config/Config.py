@@ -15,6 +15,7 @@ class Config:
         self.__config_dir = os.path.join(self.__root_dir, 'Config')
         self.__v_channel_dir = os.path.join(self.__config_dir, 'VirtualChannels')
 
+        # TODO add multi-dic merging - this will allow use the first one config as default values
         self.__read_config_file(os.path.join(self.__config_dir, 'main.example.yaml'))
         self.__read_config_file(os.path.join(self.__config_dir, 'main.yaml'))
         self.read_v_channel_configs()
@@ -28,9 +29,14 @@ class Config:
         return os.path.abspath(os.path.join(self.__root_dir, path))
 
     def read_v_channel_configs(self) -> None:
-        self.__config['v-channels'] = {'stub': {'minDelay': 1, 'maxDelay': 5}}
-
         # TODO stubbing virtual channels config reading
+
+        self.__config['v-channels'] = {
+            'stub': {'minDelay': 1, 'maxDelay': 6},
+            'mock': {'minDelay': 2, 'maxDelay': 3},
+            'test': {'minDelay': 1, 'maxDelay': 3},
+            'telegram': {**self.__config['dog-nail']}
+        }
 
     def get(self, path, default=None):
         path = str(path)

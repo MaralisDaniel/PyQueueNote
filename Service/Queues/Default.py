@@ -5,7 +5,7 @@ from .AbstractQueue import AbstractQueue
 class Default(AbstractQueue):
     __queue = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.__queue = asyncio.Queue()
 
     async def add_task(self, message: str) -> None:

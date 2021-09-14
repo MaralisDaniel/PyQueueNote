@@ -1,7 +1,7 @@
 import asyncio
 from Exceptions import ServiceException
 from .Queues import Default
-from .Workers import get_stub_worker
+import Service.Workers
 
 
 class VCollection:
@@ -30,7 +30,12 @@ class VCollection:
         self.__channels[channel] = {}
 
         queue = Default()  # TODO change for dynamic queue type usage
-        pattern, worker = get_stub_worker(params)  # TODO change for dynamic worker type usage
+
+        # TODO change for dynamic worker type usage
+        if channel == 'telegram':
+            pattern, worker = Service.Workers.telegram.get_worker(channel, params)
+        else:
+            pattern, worker = Service.Workers.stub.get_worker(channel, params)
 
         # TODO move activation (task creation in asyncio) after app is run
         asyncio.get_event_loop().create_task(worker(queue))

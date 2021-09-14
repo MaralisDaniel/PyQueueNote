@@ -12,3 +12,9 @@ queue:
   default_attemts: 5
   default_attempt_delay: 30
   default_lifetime: 180
+dog-nail:
+  host: 'https://api.telegram.org/'
+  bot_id:
+  chat_id:
+  parse_mode:
+  notify: True

@@ -3,7 +3,7 @@ import random
 from ..Queues.AbstractQueue import AbstractQueue
 
 
-def get_stub_worker(config: dict):
+def get_worker(channel: str, config: dict) -> callable:
     # TODO stub worker - replace later
     min_delay = config.get('minDelay', 1)
     max_delay = config.get('maxDelay', 5)
@@ -18,7 +18,7 @@ def get_stub_worker(config: dict):
 
             await asyncio.sleep(delay)
 
-            print(f'After {delay} seconds "{message}" was sent (stub)')
+            print(f'After {delay} seconds "{message}" was sent to {channel}')
 
             queue.complete()
 
