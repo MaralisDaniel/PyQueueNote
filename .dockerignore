@@ -1,9 +1,6 @@
 # IDE folders
 .idea
 
-# prod config files
-config.yaml
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,0 +1,8 @@
+stub:
+  worker: Stub
+  queue: AIOQueue
+  queue_size: 150
+  queue_full_timeout: 30
+  params:
+    min_delay: 1
+    max_delay: 5

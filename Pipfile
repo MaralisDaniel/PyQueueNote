@@ -4,10 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pyyaml="*"
-aiohttp="*"
-aiodns="*"
-cchardet="*"
+pyyaml=">=5.4.1"
+aiohttp=">=3.7.4.post0"
+aiodns=">=3.0.0"
+cchardet=">=2.1.7"
+tenacity=">=8.0.1"
 
 [dev-packages]
 
