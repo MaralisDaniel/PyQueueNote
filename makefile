@@ -6,8 +6,8 @@ setup:
 run-dev:
 	@pipenv run python3 main.py -d
 
-run-docker:
-	@pipenv run python3 main.py -c='config.yaml' -P80 -H='0.0.0.0'
+run-prod:
+	@pipenv run python3 main.py -c='config.yaml'
 
 help:
 	@pipenv run python3 main.py -h

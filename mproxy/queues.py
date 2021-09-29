@@ -1,36 +1,39 @@
-import abc
 import asyncio
 import logging
 
-from .exceptions import TemporaryUnawailableError, ServerInitError
+from .exceptions import TemporaryUnawailableError
+from .model import Message
+
 
 DEFAULT_LOGGER_NAME = 'm-proxy.queue'
-REGISTERED_QUEUES = {}
 
 
 # Interface for custom queues
-class BaseQueue(abc.ABC):
-    @abc.abstractmethod
-    def add_task(self, message: str) -> None:
-        pass
+class BaseQueue:
+    def __init__(self, queue_size: int, retry_after: int):
+        self._queue_size = int(queue_size)
+        self._retry_after = int(retry_after)
 
-    @abc.abstractmethod
-    async def get_task(self) -> str:
-        pass
+    def add_task(self, message: tuple[Message, int]) -> None:
+        raise NotImplementedError()
 
-    @abc.abstractmethod
-    def current_items(self) -> int:
-        pass
+    async def get_task(self) -> tuple[Message, int]:
+        raise NotImplementedError()
+
+    def current_items_count(self) -> int:
+        raise NotImplementedError()
 
 
 # Default queues
 class AIOQueue(BaseQueue):
-    def __init__(self, queue_size: int, retry_after: int, *, logger: logging.Logger = None) -> None:
-        self.queue = asyncio.Queue(queue_size)
-        self.retry_after = retry_after
+    def __init__(self, *args, logger: logging.Logger = None) -> None:
+        super().__init__(*args)
+
+        self.queue = asyncio.Queue(maxsize=self._queue_size)
+
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
-    def add_task(self, message: str) -> None:
+    def add_task(self, message: tuple[Message, int]) -> None:
         try:
             self.queue.put_nowait(message)
 
@@ -38,9 +41,9 @@ class AIOQueue(BaseQueue):
         except asyncio.QueueFull:
             self._log.warning('Failed to add message in queue - queue is full')
 
-            raise TemporaryUnawailableError('This queue is full. Try again later')
+            raise TemporaryUnawailableError('Queue of this channel is full. Try again later')
 
-    async def get_task(self) -> str:
+    async def get_task(self) -> tuple[Message, int]:
         message = await self.queue.get()
 
         self.queue.task_done()
@@ -49,31 +52,8 @@ class AIOQueue(BaseQueue):
 
         return message
 
-    def current_items(self) -> int:
+    def current_items_count(self) -> int:
         return self.queue.qsize()
 
 
-def register_queue(queue: callable, name: str = None) -> None:
-    if not issubclass(queue, BaseQueue):
-        raise ServerInitError(
-                f"Unable to register {queue.__name__} as queue - it doesn't implements {BaseQueue.__name__}"
-        )
-
-    name = name or queue.__name__
-
-    if name in REGISTERED_QUEUES:
-        raise ServerInitError(f'Queue {name} (or its alias) already registered')
-
-    REGISTERED_QUEUES[name] = queue
-
-
-def resolve_queue(name: str) -> callable:
-    if name in REGISTERED_QUEUES:
-        return REGISTERED_QUEUES[name]
-
-    raise ServerInitError(f'Requested queue {name} is not registered')
-
-
-register_queue(AIOQueue)
-
-__all__ = ['resolve_queue', 'register_queue', 'BaseQueue']
+__all__ = ['BaseQueue', 'AIOQueue']
