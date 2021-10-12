@@ -1,7 +1,5 @@
 import aiohttp
-import asyncio
 import logging
-import random
 
 from .exceptions import WorkerAwaitError, WorkerExecutionError
 from .model import Message
@@ -11,12 +9,12 @@ DEFAULT_LOGGER_NAME = 'm-proxy.worker'
 
 
 # Interface for any custom worker
-class BaseWorker:
+class WorkerInterface:
     async def operate(self, message: Message) -> None:
         raise NotImplementedError()
 
 
-class BaseHTTPWorker(BaseWorker):
+class BaseHTTPWorker(WorkerInterface):
     def __init__(self, url: str, method: str) -> None:
         self._url = url
         self._method = method
@@ -46,7 +44,7 @@ class Telegram(BaseHTTPWorker):
             *,
             url: str,
             chat_id: int,
-            bot_id: int,
+            bot_id: str,
             no_notify: bool = False,
             parse_mode: str = None,
             logger: logging.Logger = None,
@@ -60,7 +58,7 @@ class Telegram(BaseHTTPWorker):
             'disable_notification': no_notify,
         }
 
-        if len(parse_mode) > 0:
+        if parse_mode is not None and len(parse_mode) > 0:
             self._data['parse_mode'] = parse_mode
 
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
@@ -86,51 +84,8 @@ class Telegram(BaseHTTPWorker):
             )
 
             if response['status'] == 503:
-                retry_after = response.get('data', {}).get('retry_after') or response['retry-after']
+                retry_after = response.get('data', {}).get('retry_after', response['retry-after'])
 
                 raise WorkerAwaitError(503, reason, retry_after)
 
             raise WorkerExecutionError(response['status'], reason)
-
-
-class Stub(BaseWorker):
-    def __init__(
-            self,
-            channel: str,
-            *,
-            min_delay: int = 1,
-            max_delay: int = 5,
-            delay_chance: int = 20,
-            error_chance: int = 5,
-            logger: logging.Logger = None,
-    ) -> None:
-        self.channel = channel
-
-        self._min_delay = min_delay
-        self._max_delay = max_delay
-        self._error_chance = error_chance
-        self._delay_chance = delay_chance
-
-        self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
-
-    async def operate(self, message: Message) -> None:
-        delay = random.randint(self._min_delay, self._max_delay)
-        coin = random.randint(0, 100)
-
-        self._log.debug('Sleeping for %d', delay)
-
-        await asyncio.sleep(delay)
-
-        if coin <= self._error_chance:
-            self._log.info(f'After {delay} seconds "{message}" was rejected by {self.channel}')
-
-            raise WorkerExecutionError(400, 'Emulate error in request processing')
-        elif coin <= self._delay_chance:
-            self._log.info(f'After {delay} seconds "{message}" take too long to accept by {self.channel}')
-
-            raise WorkerAwaitError(503, 'Emulate error in request processing')
-
-        self._log.info(f'After {delay} seconds "{message}" was sent to {self.channel}')
-
-
-__all__ = ['Stub', 'Telegram', 'BaseWorker', 'BaseHTTPWorker']

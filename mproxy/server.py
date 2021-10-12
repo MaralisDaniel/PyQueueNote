@@ -3,17 +3,20 @@ import typing
 from aiohttp import web
 
 from .exceptions import RequestParameterError, TemporaryUnawailableError
-from .vchannel import Message, VirtualChannel
+from .vchannel import VirtualChannel
+from .model import Message
 
 
 DEFAULT_RETRY_AFTER = 120
-MAINTENANCE_KEY = 'maintenance'
 DEFAULT_LOGGER_NAME = 'm-proxy.server'
 
 
 class Application:
+    MAINTENANCE_KEY = 'maintenance'
+
     def __init__(
             self,
+            web_app: web.Application,
             queues: dict,
             workers: dict,
             *,
@@ -21,31 +24,30 @@ class Application:
             port: int,
             config: dict,
             debug: bool,
-            retry_after: int = DEFAULT_RETRY_AFTER,
+            retry_after: int = None,
             logger: logging.Logger = None
     ) -> None:
-        self.inited = False
-
         logging.basicConfig(
                 level=logging.DEBUG if debug else logging.INFO,
                 format='%(asctime)s - %(levelname)s, %(name)s: %(message)s',
         )
 
+        self._log_type = logger
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
-        self._log.info('Initializing components')
+        self._log.info('Initializing application')
 
-        self.app = web.Application()
+        self.app = web_app
         self.host = host
         self.port = port
-        self.retry_after = int(retry_after)
+        self.retry_after = DEFAULT_RETRY_AFTER if retry_after is None else int(retry_after)
 
         self._components = {'queues': queues, 'workers': workers}
 
         self.config = config
         self.channels = {}
 
-        self.app[MAINTENANCE_KEY] = True
+        self.app[Application.MAINTENANCE_KEY] = True
 
     def prepare(self) -> None:
         self._log.debug('Setting routing and middlewares')
@@ -57,24 +59,24 @@ class Application:
         self._log.debug('Setting startup and shutdown events')
         self._log.debug('Preparing virtual channels configuration')
 
-        for name, config in self.config.items():
+        for name, channel_config in self.config.items():
             self._log.debug('Registering channel %s', name)
-            self.channels[name] = VirtualChannel.create_from_config(name, config, self._components)
+            self.channels[name] = VirtualChannel.create_from_config(
+                    name,
+                    channel_config,
+                    self._components,
+                    logger=self._log_type,
+            )
 
             self.app.on_startup.append(self.channels[name].activate)
             self.app.on_shutdown.append(self.channels[name].deactivate)
 
         self._log.info('Application is ready to operate')
 
-        self.inited = True
-
     def run(self) -> None:
         self._log.debug('Starting app')
 
-        self.app[MAINTENANCE_KEY] = False
-
-        if not self.inited:
-            raise RuntimeError('Application is not inited')
+        self.app[Application.MAINTENANCE_KEY] = False
 
         self._log.debug('Run web app at %s:%d', self.host, self.port)
 
@@ -83,6 +85,9 @@ class Application:
         self._log.debug('App terminated')
 
     async def send_message(self, request: web.Request) -> web.Response:
+        if request.app[Application.MAINTENANCE_KEY]:
+            raise TemporaryUnawailableError('Service is temporary unawailable')
+
         channel = request.match_info.get('v_channel')
         self._log.debug('Channel selected: %s', channel)
 
@@ -101,19 +106,19 @@ class Application:
         data = await request.post()
 
         delay = int(data.get('delay', '0'))
-        self._log.debug('Request parameter delay is read: %s', delay)
+        self._log.debug('Request parameter delay is read: %d', delay)
 
         message = Message.extract_from_request_data(data)
         self._log.debug('Request parameter message is read: %s', message)
 
-        v_channel.get_queue().add_task((message, delay))
+        v_channel.get_queue().add_task(message, delay)
 
         self._log.debug('Request completed')
 
         return web.json_response({'status': 'success'})
 
     async def ping(self, request: web.Request) -> web.Response:
-        if request.app[MAINTENANCE_KEY]:
+        if request.app[Application.MAINTENANCE_KEY]:
             return web.Response(status=503, text='FAIL', headers={'Retry-After': str(self.retry_after)})
 
         return web.Response(text='OK')

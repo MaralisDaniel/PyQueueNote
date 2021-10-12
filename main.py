@@ -1,7 +1,9 @@
 import argparse
 import yaml
+from aiohttp import web
 
 import mproxy
+from tests.stubs import Stub
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -63,8 +65,9 @@ def main() -> None:
     args.config.close()
 
     app = mproxy.Application(
+            web.Application(),
             {'AIOQueue': mproxy.queues.AIOQueue},
-            {'Stub': mproxy.workers.Stub, 'Telegram': mproxy.workers.Telegram},
+            {'Stub': Stub, 'Telegram': mproxy.workers.Telegram},
             host=args.host,
             port=args.port,
             config=config,

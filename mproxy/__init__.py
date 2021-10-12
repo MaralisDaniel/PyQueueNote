@@ -1,5 +1,6 @@
 from .server import Application
-from .queues import BaseQueue, AIOQueue
-from .workers import BaseWorker, BaseHTTPWorker, Stub, Telegram
-from .vchannel import VirtualChannel
+from .queues import QueueInterface, AIOQueue
+from .workers import WorkerInterface, BaseHTTPWorker, Telegram
+from .vchannel import VirtualChannel, IncrementOrRetryAfterWait
 from .model import Message
+from .exceptions import *

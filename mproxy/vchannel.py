@@ -3,22 +3,24 @@ import asyncio
 import logging
 import tenacity
 
+import traceback
+
 from .exceptions import RequestExecutionError, ServerInitError, WorkerAwaitError, WorkerExecutionError
 from .model import Message
-from .queues import BaseQueue, AIOQueue
-from .workers import BaseWorker, Stub
+from .queues import QueueInterface, AIOQueue
+from .workers import WorkerInterface, Telegram
 
 
-DEFAULT_WORKER = Stub
+DEFAULT_WORKER = Telegram
 DEFAULT_QUEUE = AIOQueue
 
 DEFAULT_QUEUE_SIZE = 1000
-DEFAULT_RETRY_AFTER_TIMEOUT = 30
 DEFAULT_LOGGER_NAME = 'm-proxy.v-channel'
 
 MIN_RETRY_AFTER = 5
 MAX_RETRY_AFTER = 7200
 RETRY_ATTEMPTS = 5
+RETRY_BASE = 4
 
 
 class IncrementOrRetryAfterWait(tenacity.wait.wait_base):
@@ -31,41 +33,46 @@ class IncrementOrRetryAfterWait(tenacity.wait.wait_base):
         try:
             delay = retry_state.outcome.exception().get_delay_in_seconds()
 
-            return min(delay, self._ends)
+            if delay == 0:
+                raise AttributeError('Delay should not be 0')
         except AttributeError:
             try:
                 delay = self._starts + (self._base ** retry_state.attempt_number)
             except OverflowError:
                 delay = self._ends
 
-        return max(delay, self._ends)
+        return min(delay, self._ends)
 
 
 class VirtualChannel:
     def __init__(
             self,
             name,
-            worker: BaseWorker,
-            queue: BaseQueue,
+            worker: WorkerInterface,
+            queue: QueueInterface,
             *,
             logger: logging.Logger = None,
-            min_retry_after: int = MIN_RETRY_AFTER,
-            max_retry_after: int = MAX_RETRY_AFTER,
-            retry_attempts: int = MIN_RETRY_AFTER,
+            min_retry_after: int = None,
+            max_retry_after: int = None,
+            retry_attempts: int = None,
+            retry_base: int = None,
     ) -> None:
-        if not isinstance(worker, BaseWorker) or not isinstance(queue, BaseQueue):
-            raise ServerInitError('Worker or Queue should implement correct base class')
+        if not isinstance(worker, WorkerInterface) or not isinstance(queue, QueueInterface):
+            raise ServerInitError('Worker or Queue should implement correct interface')
 
-        self.min_retry_after = min_retry_after
-        self.max_retry_after = max_retry_after
-        self.retry_attempts = retry_attempts
+        self.min_retry_after = MIN_RETRY_AFTER if min_retry_after is None else min_retry_after
+        self.max_retry_after = MAX_RETRY_AFTER if max_retry_after is None else max_retry_after
+        self.retry_attempts = RETRY_ATTEMPTS if retry_attempts is None else retry_attempts
+        self.retry_base = RETRY_BASE if retry_base is None else retry_base
         self.name = name
         self.worker = worker
         self.queue = queue
         self.task = None
+
+        self._log_type = logger
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
-    def get_queue(self) -> BaseQueue:
+    def get_queue(self) -> QueueInterface:
         return self.queue
 
     async def activate(self, *args) -> None:
@@ -75,7 +82,6 @@ class VirtualChannel:
         self._log.info('Activating %s virtual channel', self.name)
 
         self.task = asyncio.create_task(self.assign_worker())
-
         self._log.debug('Channel active')
 
     async def deactivate(self, *args) -> None:
@@ -91,51 +97,55 @@ class VirtualChannel:
         self._log.debug('Channel inactive')
 
     async def assign_worker(self):
-        while True:
-            try:
-                asyncio.create_task(self.send_with_delay(*(await self.queue.get_task())))
-            except asyncio.CancelledError:
-                self._log.info(f'Operation of worker in {self.name} was stopped')
-
-                break
-            except Exception as e:
-                self._log.warning('Exception raised in %s worker operating cycle: %s', self.name, str(e))
-
-    async def send_with_delay(self, message: Message, delay: int):
-        await asyncio.sleep(delay)
-
         @tenacity.retry(
                 stop=tenacity.stop_after_attempt(self.retry_attempts),
-                wait=IncrementOrRetryAfterWait(self.min_retry_after, self.max_retry_after),
+                wait=IncrementOrRetryAfterWait(self.min_retry_after, self.max_retry_after, self.retry_base),
                 retry=tenacity.retry_if_exception_type(WorkerAwaitError),
                 reraise=True,
         )
-        async def execute():
+        async def execute(message: Message):
             await self.worker.operate(message)
 
-        try:
-            await execute()
-        except asyncio.CancelledError:
-            self._log.info('Retry cycle in %s worker was interrupted, task aborted', self.name)
-        except WorkerExecutionError as e:
-            self._log.error('Request in %s is rejected: %s', self.name, str(e))
-        except WorkerAwaitError as e:
-            self._log.warning('Request in %s has failed: %s', self.name, str(e))
-        except Exception as e:
-            self._log.warning('Unknown exception type raised in %s, %s', self.name, str(e))
+        while True:
+            try:
+                await execute(await self.queue.get_task())
+            except asyncio.CancelledError:
+                self._log.info(f'Execution of worker in {self.name} was stopped')
+
+                break
+            except WorkerExecutionError as e:
+                self._log.error('Request in %s is rejected: %s', self.name, repr(e))
+            except WorkerAwaitError as e:
+                self._log.warning('Request in %s has failed: %s', self.name, repr(e))
+            except Exception as e:
+                self._log.warning(
+                        'Unknown exception is raised in %s worker operating cycle: %s, %s',
+                        self.name,
+                        e.__class__.__name__,
+                        repr(e),
+                )
 
     @classmethod
-    def create_from_config(cls, name: str, config: dict, app_components: dict) -> VirtualChannel:
+    def create_from_config(
+            cls,
+            name: str,
+            config: dict,
+            app_components: dict,
+            *,
+            logger: logging.Logger = None
+    ) -> VirtualChannel:
         worker_class = app_components['workers'].get(config.get('worker'), DEFAULT_WORKER)
         queue_class = app_components['queues'].get(config.get('queue'), DEFAULT_QUEUE)
 
         return cls(
                 name,
-                worker_class(name, **config.get('params', {})),
-                queue_class(
-                        config.get('queue_size', DEFAULT_QUEUE_SIZE),
-                        config.get('queue_full_timeout', DEFAULT_RETRY_AFTER_TIMEOUT),
-                ),
+                worker_class(name, **{**config.get('params', {}), 'logger': logger}),
+                queue_class(config.get('queue_size', DEFAULT_QUEUE_SIZE), logger=logger),
+                min_retry_after=config.get('minRetryAfter'),
+                max_retry_after=config.get('maxRetryAfter'),
+                retry_attempts=config.get('maxAttempts'),
+                retry_base=config.get('retryBase'),
+                logger=logger,
         )
 
     @property
