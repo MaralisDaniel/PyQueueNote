@@ -8,9 +8,6 @@ jobs:
 
     strategy:
       matrix:
-        python-version:
-          - "3.9"
-          - "3.10"
         os:
           - "ubuntu-latest"
           - "windows-latest"
@@ -20,10 +17,10 @@ jobs:
       - name: Chekout to branch
         uses: actions/checkout@v2
 
-      - name: Get Python ${{ matrix.python-version }}
+      - name: Get Python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.9
 
       - name: Sync dependencies
         run: |
