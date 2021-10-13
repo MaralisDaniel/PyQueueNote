@@ -1,8 +1,4 @@
-PyQueueNote
+py-message-proxy
 =========
 
-This service is under development
-
-In future it will allow to make async message send in different chats and services (like email and SMS)
-
-I will fill this readme file close to end-stages
+Service allows you to send messages to Telegram with help of http-proxy in "fire-and-forget" way: proxy will deal with delivery of message to Telegram itself
