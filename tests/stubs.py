@@ -5,7 +5,6 @@ import typing
 
 import mproxy
 
-
 DEFAULT_LOGGER_NAME = 'stubs.worker'
 
 

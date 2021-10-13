@@ -1,11 +1,11 @@
 import logging
 import typing
+
 from aiohttp import web
 
 from .exceptions import RequestParameterError, TemporaryUnawailableError
-from .vchannel import VirtualChannel
 from .model import Message
-
+from .vchannel import VirtualChannel
 
 DEFAULT_RETRY_AFTER = 120
 DEFAULT_LOGGER_NAME = 'm-proxy.server'

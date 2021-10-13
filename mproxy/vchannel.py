@@ -1,15 +1,14 @@
 from __future__ import annotations
+
 import asyncio
 import logging
-import tenacity
 
-import traceback
+import tenacity
 
 from .exceptions import RequestExecutionError, ServerInitError, WorkerAwaitError, WorkerExecutionError
 from .model import Message
-from .queues import QueueInterface, AIOQueue
-from .workers import WorkerInterface, Telegram
-
+from .queues import AIOQueue, QueueInterface
+from .workers import Telegram, WorkerInterface
 
 DEFAULT_WORKER = Telegram
 DEFAULT_QUEUE = AIOQueue

@@ -4,7 +4,6 @@ import logging
 from .exceptions import TemporaryUnawailableError
 from .model import Message
 
-
 DEFAULT_LOGGER_NAME = 'm-proxy.queue'
 
 

@@ -2,13 +2,14 @@ import asyncio
 import datetime
 import logging
 import random
-import uuid
 import unittest
 import unittest.mock
-from aiohttp.web import Request, Response, Application, HTTPException
+import uuid
+
+from aiohttp.web import Application, HTTPException, Request, Response
 
 import mproxy
-from stubs import Stub
+from .stubs import Stub
 
 
 class TestWorkerAwaitError(unittest.TestCase):

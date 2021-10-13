@@ -1,6 +1,8 @@
 from __future__ import annotations
-from multidict import MultiDictProxy
+
 from typing import Union
+
+from multidict import MultiDictProxy
 
 from .exceptions import RequestParameterError
 

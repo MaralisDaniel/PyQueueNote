@@ -11,3 +11,6 @@ run-prod:
 
 help:
 	@pipenv run python3 main.py -h
+
+test:
+	@pipenv run python3 -m unittest

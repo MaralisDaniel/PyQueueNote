@@ -1,5 +1,6 @@
-import aiohttp
 import logging
+
+import aiohttp
 
 from .exceptions import WorkerAwaitError, WorkerExecutionError
 from .model import Message
