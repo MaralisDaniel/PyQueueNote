@@ -28,7 +28,7 @@ jobs:
       - name: Sync dependencies
         run: |
           python --version
-          python -m pip install --upgrade
+          python -m pip install pip --upgrade
           pip install pipenv --no-cache-dir
           pipenv sync
 
