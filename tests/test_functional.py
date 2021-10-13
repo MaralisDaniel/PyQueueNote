@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import typing
 import unittest
 import unittest.mock
 
@@ -11,7 +10,7 @@ import mproxy
 from .stubs import Stub
 
 
-class TestMProxyApplication(unittest.TestCase):
+class TestMProxyApplication(unittest.IsolatedAsyncioTestCase):
     HOST = 'http://example.com/'
     PORT = 18181
     CHANNEL_NAME = 'TestChannel'
@@ -23,103 +22,43 @@ class TestMProxyApplication(unittest.TestCase):
         self.request_mock.match_info.get.return_value = TestMProxyApplication.CHANNEL_NAME
         self.request_mock.post = unittest.mock.AsyncMock(return_value={'text': TestMProxyApplication.TEST_MESSAGE})
 
-        if self.id().split('.').pop() != 'test_delays':
-            config = {
-                'worker': 'Stub',
-                'queue': 'AIOQueue',
-                'queue_size': 3,
-                'params': {
-                    'min_delay': 1,
-                    'max_delay': 5,
-                },
-            }
+    async def test_send_message(self):
+        await self.prepare_app()
 
-            with unittest.mock.patch('logging.basicConfig', autospec=True):
-                self.sample = mproxy.Application(
-                        web.Application(),
-                        {'AIOQueue': mproxy.queues.AIOQueue},
-                        {'Stub': Stub},
-                        host=TestMProxyApplication.HOST,
-                        port=TestMProxyApplication.PORT,
-                        config={TestMProxyApplication.CHANNEL_NAME: config},
-                        debug=False,
-                        logger=self.logger_mock,
-                )
-
-            self.sample.app[mproxy.Application.MAINTENANCE_KEY] = False
-            self.request_mock.app = self.sample.app
-
-    def test_send_message(self):
-        async def runner(handler: typing.Coroutine):
-            self.sample.prepare()
-
-            await self.sample.channels[TestMProxyApplication.CHANNEL_NAME].activate()
-
-            return await handler
-
-        response = asyncio.run(runner(self.sample.send_message(self.request_mock)))
+        response = await self.sample.send_message(self.request_mock)
 
         self.assertIsInstance(response, web.Response)
         self.assertEqual(response.status, 200)
         self.assertEqual(response.text, '{"status": "success"}')
 
-    def test_overload(self):
-        async def runner(handlers: list[typing.Coroutine]):
-            self.sample.prepare()
-
-            await self.sample.channels[TestMProxyApplication.CHANNEL_NAME].activate()
-
-            for handler in handlers:
-                await handler
-
-        payload = []
-
-        for _ in range(0, 4):
-            payload.append(self.sample.send_message(self.request_mock))
+    async def test_overload(self):
+        await self.prepare_app()
 
         with self.assertRaises(mproxy.TemporaryUnawailableError):
-            asyncio.run(runner(payload))
+            for _ in range(0, 4):
+                await self.sample.send_message(self.request_mock)
 
-    def test_delays(self):
-        async def runner():
-            config = {
-                'worker': 'Stub',
-                'queue': 'AIOQueue',
-                'queue_size': 3,
-                'minRetryAfter': 1,
-                'maxRetryAfter': 60,
-                'retryBase': 1.5,
-                'params': {
-                    'min_delay': 1,
-                    'max_delay': 5,
-                    'coin_scenario': iter([10, 15, 50]),
-                    'delay_scenario': iter([1, 2, 3]),
-                },
-            }
+    async def test_delays(self):
+        config = {
+            'worker': 'Stub',
+            'queue': 'AIOQueue',
+            'queue_size': 3,
+            'minRetryAfter': 1,
+            'maxRetryAfter': 60,
+            'retryBase': 1.5,
+            'params': {
+                'min_delay': 1,
+                'max_delay': 5,
+                'coin_scenario': iter([10, 15, 50]),
+                'delay_scenario': iter([1, 2, 3]),
+            },
+        }
 
-            with unittest.mock.patch('logging.basicConfig', autospec=True):
-                self.sample = mproxy.Application(
-                        web.Application(),
-                        {'AIOQueue': mproxy.queues.AIOQueue},
-                        {'Stub': Stub},
-                        host=TestMProxyApplication.HOST,
-                        port=TestMProxyApplication.PORT,
-                        config={TestMProxyApplication.CHANNEL_NAME: config},
-                        debug=False,
-                        logger=self.logger_mock,
-                )
+        await self.prepare_app(config)
 
-            self.sample.prepare()
-            self.sample.app[mproxy.Application.MAINTENANCE_KEY] = False
+        await self.sample.send_message(self.request_mock)
 
-            self.request_mock.app = self.sample.app
-
-            await self.sample.channels[TestMProxyApplication.CHANNEL_NAME].activate()
-            await self.sample.send_message(self.request_mock)
-
-            await asyncio.sleep(13)
-
-        asyncio.run(runner())
+        await asyncio.sleep(13)
 
         message = 'Message header: "", text: "This is test message", payload is empty'
         expected = [
@@ -133,6 +72,34 @@ class TestMProxyApplication(unittest.TestCase):
                 expected.remove(search.args[0])
 
         self.assertEqual(len(expected), 0)
+
+    async def prepare_app(self, config: dict = None) -> None:
+        config = config or {
+            'worker': 'Stub',
+            'queue': 'AIOQueue',
+            'queue_size': 3,
+            'params': {
+                'min_delay': 1,
+                'max_delay': 5,
+            },
+        }
+
+        with unittest.mock.patch('logging.basicConfig', autospec=True):
+            self.sample = mproxy.Application(
+                    web.Application(),
+                    {'AIOQueue': mproxy.queues.AIOQueue},
+                    {'Stub': Stub},
+                    host=TestMProxyApplication.HOST,
+                    port=TestMProxyApplication.PORT,
+                    config={TestMProxyApplication.CHANNEL_NAME: config},
+                    debug=False,
+                    logger=self.logger_mock,
+            )
+
+        self.sample.app[mproxy.Application.MAINTENANCE_KEY] = False
+        self.request_mock.app = self.sample.app
+
+        await self.sample.channels[TestMProxyApplication.CHANNEL_NAME].activate()
 
 
 if __name__ == '__main__':

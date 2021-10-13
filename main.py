@@ -75,7 +75,6 @@ def main() -> None:
             debug=args.debug,
     )
 
-    app.prepare()
     app.run()
 
 

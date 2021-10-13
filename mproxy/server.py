@@ -49,7 +49,6 @@ class Application:
 
         self.app[Application.MAINTENANCE_KEY] = True
 
-    def prepare(self) -> None:
         self._log.debug('Setting routing and middlewares')
 
         self.app.middlewares.append(self.handle_errors_middleware)

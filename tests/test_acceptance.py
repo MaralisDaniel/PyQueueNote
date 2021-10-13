@@ -99,7 +99,6 @@ class TestMProxy(AioHTTPTestCase):
         )
 
         web_app.app.router.add_route('*', '/{bot_id}/sendMessage', stub_handler)
-        web_app.prepare()
 
         if 'maintenance' not in self.id().split('.').pop():
             web_app.app[mproxy.Application.MAINTENANCE_KEY] = False

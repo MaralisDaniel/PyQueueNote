@@ -124,7 +124,7 @@ class TestMessage(unittest.TestCase):
             mproxy.Message.extract_from_request_data({}, required=True)
 
 
-class TestAIOQueue(unittest.TestCase):
+class TestAIOQueue(unittest.IsolatedAsyncioTestCase):
     DELAY = 5
 
     def setUp(self) -> None:
@@ -147,11 +147,11 @@ class TestAIOQueue(unittest.TestCase):
 
         self.mock_logger.debug.assert_called()
 
-    def test_get(self) -> None:
+    async def test_get(self) -> None:
         with unittest.mock.patch('asyncio.Queue', autospec=True) as mock:
             sample = mproxy.AIOQueue(5, self.mock_logger)
 
-            asyncio.run(sample.get_task())
+            await sample.get_task()
 
         mock.return_value.task_done.assert_called_once()
         mock.return_value.get.assert_awaited_once()
@@ -183,7 +183,7 @@ class TestAIOQueue(unittest.TestCase):
         self.mock_logger.warning.assert_called_once()
 
 
-class TestStubWorker(unittest.TestCase):
+class TestStubWorker(unittest.IsolatedAsyncioTestCase):
     TEST_MESSAGE = 'Test Message 1'
     CHANNEL_NAME = 'TestChannel'
 
@@ -191,7 +191,7 @@ class TestStubWorker(unittest.TestCase):
         self.mock_logger = unittest.mock.Mock(spec=logging.Logger)
         self.mock_message = unittest.mock.Mock(spec=mproxy.Message, text=TestStubWorker.TEST_MESSAGE)
 
-    def test_operate_success(self) -> None:
+    async def test_operate_success(self) -> None:
         min_delay = 2
         max_delay = 10
         coin_error = 10
@@ -210,7 +210,7 @@ class TestStubWorker(unittest.TestCase):
                         delay_chance=coin_delay,
                 )
 
-                asyncio.run(sample.operate(self.mock_message))
+                await sample.operate(self.mock_message)
 
         mock_random.assert_any_call(min_delay, max_delay)
 
@@ -219,7 +219,7 @@ class TestStubWorker(unittest.TestCase):
         self.mock_logger.debug.assert_called()
         self.mock_logger.info.assert_called_once()
 
-    def test_operate_error(self) -> None:
+    async def test_operate_error(self) -> None:
         min_delay = 2
         max_delay = 10
         coin_error = 10
@@ -246,7 +246,7 @@ class TestStubWorker(unittest.TestCase):
                         )
 
                         with self.assertRaises(dataset['error']):
-                            asyncio.run(sample.operate(self.mock_message))
+                            await sample.operate(self.mock_message)
 
                 mock_random.assert_any_call(min_delay, max_delay)
                 mock_sleep.assert_awaited_once_with(5)
@@ -256,8 +256,8 @@ class TestStubWorker(unittest.TestCase):
                 self.mock_logger.reset_mock()
 
 
-class TestBaseHTTPWorker(unittest.TestCase):
-    def test_execute_query(self) -> None:
+class TestBaseHTTPWorker(unittest.IsolatedAsyncioTestCase):
+    async def test_execute_query(self) -> None:
         url = 'http://example.com/'
         data_provider = {
             'Get text': {'method': 'GET'},
@@ -309,7 +309,7 @@ class TestBaseHTTPWorker(unittest.TestCase):
 
                         sample = mproxy.BaseHTTPWorker(url, data_set['method'])
 
-                        response = asyncio.run(sample.execute_query(request_data))
+                        response = await sample.execute_query(request_data)
 
                 timeout.assert_called_once()
                 client.assert_called_once()
@@ -328,7 +328,7 @@ class TestBaseHTTPWorker(unittest.TestCase):
             json_mock.reset_mock()
 
 
-class TestTelegramWorker(unittest.TestCase):
+class TestTelegramWorker(unittest.IsolatedAsyncioTestCase):
     TEST_MESSAGE = 'Test Telegram Message 1'
     CHANNEL_NAME = 'TestChannel'
     URL_EXAMPLE = 'http://example.com/'
@@ -344,7 +344,7 @@ class TestTelegramWorker(unittest.TestCase):
         self.mock_logger = unittest.mock.Mock(spec=logging.Logger)
         self.mock_message = unittest.mock.Mock(spec=mproxy.Message, text=TestTelegramWorker.TEST_MESSAGE)
 
-    def test_operate(self) -> None:
+    async def test_operate(self) -> None:
         with unittest.mock.patch('mproxy.Telegram.execute_query', autospec=True) as base:
             base.return_value = {
                 'status': 200,
@@ -359,7 +359,7 @@ class TestTelegramWorker(unittest.TestCase):
                     logger=self.mock_logger,
             )
 
-            asyncio.run(sample.operate(self.mock_message))
+            await sample.operate(self.mock_message)
 
         base.assert_called_once()
 
@@ -368,7 +368,7 @@ class TestTelegramWorker(unittest.TestCase):
         self.mock_logger.debug.assert_called()
         self.mock_logger.info.assert_called()
 
-    def test_operate_fail(self) -> None:
+    async def test_operate_fail(self) -> None:
         data_provider = {
             'Stop error': {
                 'response': {
@@ -411,7 +411,7 @@ class TestTelegramWorker(unittest.TestCase):
                     )
 
                     with self.assertRaises(data_set['error_type']) as er:
-                        asyncio.run(sample.operate(self.mock_message))
+                        await sample.operate(self.mock_message)
 
                 if data_set['error_type'].__name__ == 'mproxy.WorkerAwaitError':
                     self.assertEqual(er.exception.get_delay_in_seconds(), 30)
@@ -478,7 +478,7 @@ class TestIncrementOrRetryAfterWait(unittest.TestCase):
             retry_state_mock.reset_mock()
 
 
-class TestVirtualChannel(unittest.TestCase):
+class TestVirtualChannel(unittest.IsolatedAsyncioTestCase):
     CHANNEL_NAME = 'TestChannel'
     MIN_RETRY_AFTER = 5
     MAX_RETRY_AFTER = 73
@@ -649,21 +649,17 @@ class TestVirtualChannel(unittest.TestCase):
         self.assertEqual(self.sample.get_queue(), self.queue_mock)
         self.queue_mock.assert_not_called()
 
-    def test_activate(self) -> None:
+    async def test_activate(self) -> None:
         with unittest.mock.patch('mproxy.VirtualChannel.assign_worker'):
             with unittest.mock.patch('asyncio.create_task', autospec=True) as create_mock:
                 create_mock.return_value = self.mock_task
 
-                # avoid unnecessary RunTime warning
-                async def runner() -> None:
-                    await self.sample.activate()
+                await self.sample.activate()
 
-                    await create_mock.call_args.args[0]
-
-                asyncio.run(runner())
+                await create_mock.call_args.args[0]
 
                 with self.assertRaises(mproxy.RequestExecutionError):
-                    asyncio.run(self.sample.activate())
+                    await self.sample.activate()
 
                 create_mock.assert_called_once()
                 self.assertEqual(self.sample.task, self.mock_task)
@@ -671,13 +667,13 @@ class TestVirtualChannel(unittest.TestCase):
                 self.mock_logger.debug.assert_called()
                 self.mock_logger.info.assert_called()
 
-    def test_deactivate(self) -> None:
+    async def test_deactivate(self) -> None:
         self.sample.task = self.mock_task
 
-        asyncio.run(self.sample.deactivate())
+        await self.sample.deactivate()
 
         with self.assertRaises(mproxy.RequestExecutionError):
-            asyncio.run(self.sample.deactivate())
+            await self.sample.deactivate()
 
         self.mock_task.cancel.assert_called_once()
 
@@ -702,7 +698,7 @@ class TestVirtualChannel(unittest.TestCase):
 
                 self.assertEqual(self.sample.is_running, data_set['expected'])
 
-    def test_assign_worker(self):
+    async def test_assign_worker(self):
         worker_data = [None, None, asyncio.CancelledError]
 
         with unittest.mock.patch('tenacity.retry', autospec=True) as retry_mock:
@@ -711,7 +707,7 @@ class TestVirtualChannel(unittest.TestCase):
 
             retry_mock.return_value.side_effect = lambda x: x
 
-            asyncio.run(self.sample.assign_worker())
+            await self.sample.assign_worker()
 
         retry_mock.assert_called_once()
         retry_mock.return_value.assert_called_once()
@@ -719,7 +715,7 @@ class TestVirtualChannel(unittest.TestCase):
 
         self.assertEqual(self.worker_mock.operate.call_count, len(worker_data))
 
-    def test_assign_worker_stability(self) -> None:
+    async def test_assign_worker_stability(self) -> None:
         def check_warning(count: int) -> None:
             self.mock_logger.warning.assert_called()
             self.assertGreaterEqual(self.mock_logger.warning.call_count, count)
@@ -775,7 +771,7 @@ class TestVirtualChannel(unittest.TestCase):
 
                     retry_mock.return_value.side_effect = lambda x: x
 
-                    asyncio.run(self.sample.assign_worker())
+                    await self.sample.assign_worker()
 
                 retry_mock.return_value.assert_called_once()
                 self.worker_mock.operate.assert_called()
@@ -787,7 +783,7 @@ class TestVirtualChannel(unittest.TestCase):
             self.mock_logger.reset_mock()
 
 
-class TestApplication(unittest.TestCase):
+class TestApplication(unittest.IsolatedAsyncioTestCase):
     HOST = 'www.example.com'
     PORT = 11111
     CHANNEL_NAME = 'TestChannel'
@@ -803,19 +799,6 @@ class TestApplication(unittest.TestCase):
 
         self.web_app_mock = unittest.mock.MagicMock(spec=Application)
 
-        with unittest.mock.patch('logging.basicConfig', autospec=True):
-            self.sample = mproxy.Application(
-                    self.web_app_mock,
-                    TestApplication.COMPONENTS['queues'],
-                    TestApplication.COMPONENTS['workers'],
-                    host=TestApplication.HOST,
-                    port=TestApplication.PORT,
-                    config={TestApplication.CHANNEL_NAME: {}},
-                    debug=False,
-                    retry_after=TestApplication.RETRY_AFTER,
-                    logger=self.mock_logger,
-            )
-
     def test_create(self) -> None:
         config = {TestApplication.CHANNEL_NAME: {}}  # type: dict[str, dict]
 
@@ -827,17 +810,20 @@ class TestApplication(unittest.TestCase):
         for name, data_set in data_provider.items():
             with self.subTest(f'Test create with data set "{name}"'):
                 with unittest.mock.patch('logging.basicConfig', autospec=True) as log_config:
-                    sample = mproxy.Application(
-                            self.web_app_mock,
-                            TestApplication.COMPONENTS['queues'],
-                            TestApplication.COMPONENTS['workers'],
-                            host=TestApplication.HOST,
-                            port=TestApplication.PORT,
-                            config=config,
-                            debug=data_set['debug'],
-                            retry_after=TestApplication.RETRY_AFTER,
-                            logger=self.mock_logger,
-                    )
+                    with unittest.mock.patch('mproxy.VirtualChannel.create_from_config', autospec=True) as channel:
+                        channel.return_value = self.channel_mock
+
+                        sample = mproxy.Application(
+                                self.web_app_mock,
+                                TestApplication.COMPONENTS['queues'],
+                                TestApplication.COMPONENTS['workers'],
+                                host=TestApplication.HOST,
+                                port=TestApplication.PORT,
+                                config=config,
+                                debug=data_set['debug'],
+                                retry_after=TestApplication.RETRY_AFTER,
+                                logger=self.mock_logger,
+                        )
 
                 log_config.assert_called_once()
                 self.assertEqual(log_config.call_args.kwargs['level'], data_set['type'])
@@ -847,37 +833,33 @@ class TestApplication(unittest.TestCase):
                 self.assertEqual(sample._components, TestApplication.COMPONENTS)
 
                 self.web_app_mock.assert_not_called()
+                self.web_app_mock.router.add_route.assert_called()
+                self.assertGreaterEqual(self.web_app_mock.router.add_route.call_count, 2)
+                self.web_app_mock.middlewares.append.assert_called()
+                self.assertGreaterEqual(self.web_app_mock.middlewares.append.call_count, 1)
+
+                channel.assert_called_once_with(
+                        TestApplication.CHANNEL_NAME,
+                        {},
+                        TestApplication.COMPONENTS,
+                        logger=self.mock_logger,
+                )
+
+                self.web_app_mock.on_startup.append.assert_called_once()
+                self.web_app_mock.on_shutdown.append.assert_called_once()
+
+                self.mock_logger.debug.assert_called()
                 self.mock_logger.info.assert_called()
 
             self.mock_logger.reset_mock()
             self.web_app_mock.reset_mock()
             self.channel_mock.reset_mock()
 
-    def test_prepare(self) -> None:
-        with unittest.mock.patch('mproxy.VirtualChannel.create_from_config', autospec=True) as channel:
-            channel.return_value = self.channel_mock
-
-            self.sample.prepare()
-
-        self.web_app_mock.router.add_route.assert_called()
-        self.assertGreaterEqual(self.web_app_mock.router.add_route.call_count, 2)
-        self.web_app_mock.middlewares.append.assert_called()
-        self.assertGreaterEqual(self.web_app_mock.middlewares.append.call_count, 1)
-
-        channel.assert_called_once_with(
-                TestApplication.CHANNEL_NAME,
-                {},
-                TestApplication.COMPONENTS,
-                logger=self.mock_logger,
-        )
-
-        self.web_app_mock.on_startup.append.assert_called_once()
-        self.web_app_mock.on_shutdown.append.assert_called_once()
-
-        self.mock_logger.debug.assert_called()
-        self.mock_logger.info.assert_called()
+        self.sample = sample
 
     def test_run(self) -> None:
+        self.test_create()
+
         with unittest.mock.patch('aiohttp.web.run_app', autospec=True) as web_runner:
             self.sample.run()
 
@@ -885,7 +867,9 @@ class TestApplication(unittest.TestCase):
 
         self.mock_logger.debug.assert_called()
 
-    def test_ping(self) -> None:
+    async def test_ping(self) -> None:
+        self.test_create()
+
         data_provider = {
             'normal': {'state': False, 'response': {'text': 'OK'}},
             'maintenance': {
@@ -906,12 +890,14 @@ class TestApplication(unittest.TestCase):
 
             with self.subTest(f'Test ping with data set "{name}"'):
                 with unittest.mock.patch('aiohttp.web.Response', autospec=True) as response:
-                    result = asyncio.run(self.sample.ping(request_mock))
+                    result = await self.sample.ping(request_mock)
 
                 response.assert_called_once_with(**data_set['response'])
                 self.assertEqual(response.return_value, result)
 
-    def test_middleware(self) -> None:
+    async def test_middleware(self) -> None:
+        self.test_create()
+
         handler_mock = unittest.mock.AsyncMock()
         request_mock = unittest.mock.Mock(spec=Request)
         response_mock = unittest.mock.Mock(spec=Response)
@@ -919,12 +905,14 @@ class TestApplication(unittest.TestCase):
         handler_mock.return_value = response_mock
 
         with unittest.mock.patch('aiohttp.web.json_response', autospec=True):
-            result = asyncio.run(self.sample.handle_errors_middleware(request_mock, handler_mock))
+            result = await self.sample.handle_errors_middleware(request_mock, handler_mock)
 
         handler_mock.assert_awaited_once_with(request_mock)
         self.assertEqual(result, response_mock)
 
-    def test_middleware_catch(self) -> None:
+    async def test_middleware_catch(self) -> None:
+        self.test_create()
+
         data_provider = {
             'validation': {'exception': mproxy.RequestParameterError('Test'), 'should_raise': False, 'code': 422},
             'unavailable': {'exception': mproxy.TemporaryUnawailableError('Test'), 'should_raise': False, 'code': 503},
@@ -945,9 +933,9 @@ class TestApplication(unittest.TestCase):
 
                     if data_set['should_raise']:
                         with self.assertRaises(HTTPException):
-                            asyncio.run(self.sample.handle_errors_middleware(request_mock, handler_mock))
+                            await self.sample.handle_errors_middleware(request_mock, handler_mock)
                     else:
-                        asyncio.run(self.sample.handle_errors_middleware(request_mock, handler_mock))
+                        await self.sample.handle_errors_middleware(request_mock, handler_mock)
 
                         response_mock.assert_called_once_with(response_data, status=data_set['code'])
 
@@ -955,7 +943,9 @@ class TestApplication(unittest.TestCase):
 
             handler_mock.reset_mock()
 
-    def test_send_message(self) -> None:
+    async def test_send_message(self) -> None:
+        self.test_create()
+
         test_data = {'text': 'Test sample', 'delay': '7'}
         request_mock = unittest.mock.Mock(spec=Request)
         message_mock = unittest.mock.Mock(spec=mproxy.Message)
@@ -976,7 +966,7 @@ class TestApplication(unittest.TestCase):
                 response.return_value = response
                 message.return_value = message_mock
 
-                result = asyncio.run(self.sample.send_message(request_mock))
+                result = await self.sample.send_message(request_mock)
 
         self.channel_mock.is_running.__bool__.assert_called_once()
         self.channel_mock.get_queue.return_value.add_task.assert_called_once_with(message_mock, int(test_data['delay']))
@@ -989,7 +979,9 @@ class TestApplication(unittest.TestCase):
 
         self.mock_logger.debug.assert_called()
 
-    def test_send_message_fails(self) -> None:
+    async def test_send_message_fails(self) -> None:
+        self.test_create()
+
         data_provider = {
             'no channel': {'exception': mproxy.RequestParameterError, 'channel': 'SomeChannel'},
             'inactive channel': {'exception': mproxy.TemporaryUnawailableError, 'running': False},
@@ -1030,7 +1022,7 @@ class TestApplication(unittest.TestCase):
                             self.channel_mock.get_queue.side_effect = None
 
                         with self.assertRaises(data_set['exception']):
-                            asyncio.run(self.sample.send_message(request_mock))
+                            await self.sample.send_message(request_mock)
 
             self.channel_mock.reset_mock()
 
