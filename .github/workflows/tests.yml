@@ -1,0 +1,37 @@
+name: py-message-proxy CI
+
+on: push
+
+jobs:
+  run-tests:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-latest"
+          - "windows-latest"
+          - "macos-latest"
+
+    steps:
+      - name: Chekout to branch
+        uses: actions/checkout@v2
+
+      - name: Get Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Sync dependencies
+        run: |
+          python --version
+          python -m pip install pip --upgrade
+          pip install pipenv --no-cache-dir
+          pipenv sync
+
+      - name: Run tests in order units, functional, acceptance
+        run: |
+          pipenv run python -m unittest tests.test_units
+          pipenv run python -m unittest tests.test_functional
+          pipenv run python -m unittest tests.test_acceptance
+
