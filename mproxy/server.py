@@ -45,7 +45,7 @@ class Application:
         self._components = {'queues': queues, 'workers': workers}
 
         self.config = config
-        self.channels = {}
+        self.channels = {}  # type: dict[str, VirtualChannel]
 
         self.app[Application.MAINTENANCE_KEY] = True
 

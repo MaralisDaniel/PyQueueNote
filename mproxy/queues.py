@@ -24,7 +24,7 @@ class AIOQueue(QueueInterface):
     def __init__(self, queue_size, logger: logging.Logger = None) -> None:
         self._queue_size = int(queue_size)
 
-        self.queue = asyncio.Queue(maxsize=self._queue_size)
+        self.queue = asyncio.Queue(maxsize=self._queue_size)  # type: asyncio.Queue
 
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 

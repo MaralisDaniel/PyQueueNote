@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import typing
 
 import tenacity
 
@@ -23,12 +24,12 @@ RETRY_BASE = 4
 
 
 class IncrementOrRetryAfterWait(tenacity.wait.wait_base):
-    def __init__(self, starts: int, ends: int, base: int = 4):
+    def __init__(self, starts: int, ends: int, base: int = 4) -> None:
         self._starts = starts
         self._ends = ends
         self._base = base
 
-    def __call__(self, retry_state: tenacity.RetryCallState):
+    def __call__(self, retry_state: tenacity.RetryCallState) -> int:
         try:
             delay = retry_state.outcome.exception().get_delay_in_seconds()
 
@@ -66,7 +67,7 @@ class VirtualChannel:
         self.name = name
         self.worker = worker
         self.queue = queue
-        self.task = None
+        self.task = None  # type: typing.Union[None, asyncio.Task]
 
         self._log_type = logger
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
@@ -95,7 +96,7 @@ class VirtualChannel:
 
         self._log.debug('Channel inactive')
 
-    async def assign_worker(self):
+    async def assign_worker(self) -> None:
         @tenacity.retry(
                 stop=tenacity.stop_after_attempt(self.retry_attempts),
                 wait=IncrementOrRetryAfterWait(self.min_retry_after, self.max_retry_after, self.retry_base),
@@ -148,10 +149,10 @@ class VirtualChannel:
         )
 
     @property
-    def is_running(self):
+    def is_running(self) -> bool:
         return self.task is not None and not self.task.done()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         state = 'idle' if self.task is None else 'running'
 
         return f'Virtual channel {self.name}, state {state}'

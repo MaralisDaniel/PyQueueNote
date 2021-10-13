@@ -7,6 +7,7 @@ import unittest.mock
 from aiohttp import web
 
 import mproxy
+
 from .stubs import Stub
 
 

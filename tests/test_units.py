@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import random
+import typing
 import unittest
 import unittest.mock
 import uuid
@@ -32,7 +33,7 @@ class TestWorkerAwaitError(unittest.TestCase):
             'as GMT date': (
                     datetime.datetime.now() + datetime.timedelta(0, TestWorkerAwaitError.DELAY)
             ).strftime('%a, %d %b %Y %H:%M:%S GMT'),
-        }
+        }  # type: dict[str, typing.Union[int, float, str]]
 
         for name, data_set in data_provider.items():
             with self.subTest(f'Test get delay in seconds with data set "{name}"'):
@@ -64,7 +65,7 @@ class TestMessage(unittest.TestCase):
                 'data': {'header': 'Message header', 'payload': [b'123456', b'123456']},
                 'expected': 'Message header: "Message header", text: "", payload is not empty',
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         for name, data_set in data_provider.items():
             with self.subTest(msg=f'Test Message repr with dataset "{name}"'):
@@ -105,7 +106,7 @@ class TestMessage(unittest.TestCase):
                 'required': False,
                 'expected': {'text': None, 'header': None, 'payload': None},
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         for name, data_set in data_provider.items():
             with self.subTest(msg=f'Test Message static constructor with data set "{name}"'):
@@ -227,7 +228,7 @@ class TestStubWorker(unittest.TestCase):
         data_provider = {
             'Delay': {'coin': 20, 'error': mproxy.WorkerAwaitError},
             'Error': {'coin': 5, 'error': mproxy.WorkerExecutionError},
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         for name, dataset in data_provider.items():
             with self.subTest(f'Test stub worker operate error with data set "{name}"'):
@@ -264,7 +265,7 @@ class TestBaseHTTPWorker(unittest.TestCase):
             'Post': {'method': 'POST', 'data': {'test': 'value'}},
             'Error request': {'method': 'GET', 'status': 400},
             'Delay request': {'method': 'GET', 'status': 503, 'retry_after': 30},
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         text_mock = unittest.mock.Mock()
         json_mock = unittest.mock.AsyncMock()
@@ -337,7 +338,7 @@ class TestTelegramWorker(unittest.TestCase):
             'text': TestTelegramWorker.TEST_MESSAGE,
             'chat_id': random.randint(100, 10000),
             'disable_notification': False,
-        }
+        }  # type: dict[str, typing.Any[TestTelegramWorker.TEST_MESSAGE, int, bool]]
 
         self.bot_id = str(uuid.uuid4())
         self.mock_logger = unittest.mock.Mock(spec=logging.Logger)
@@ -394,7 +395,7 @@ class TestTelegramWorker(unittest.TestCase):
                 },
                 'error_type': mproxy.WorkerAwaitError,
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any[dict[str, typing.Any], Exception]]]
 
         for name, data_set in data_provider.items():
             with self.subTest(f'Test operate fails with data set "{name}"'):
@@ -522,7 +523,7 @@ class TestVirtualChannel(unittest.TestCase):
             'No queue': {'worker': self.worker_mock, 'queue': None},
             'Incorrect worker': {'worker': self, 'queue': self.queue_mock},
             'Incorrect queue': {'worker': self.worker_mock, 'queue': self},
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         for name, data_set in data_provider.items():
             with self.subTest(f'Test incorrect virtual channel with data set"{name}"'):
@@ -605,7 +606,7 @@ class TestVirtualChannel(unittest.TestCase):
                 'queue_size': TestVirtualChannel.QUEUE_SIZE,
                 'params': {'some': 'Another params'},
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         components = unittest.mock.MagicMock()
         components.__getitem__.side_effect = mock_type
@@ -764,7 +765,7 @@ class TestVirtualChannel(unittest.TestCase):
                 'check': check_info,
                 'check_count': 1,
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any]]
 
         for name, data_set in data_provider.items():
             with self.subTest(f'Test assign worker stability with data set"{name}"'):
@@ -816,12 +817,12 @@ class TestApplication(unittest.TestCase):
             )
 
     def test_create(self) -> None:
-        config = {TestApplication.CHANNEL_NAME: {}}
+        config = {TestApplication.CHANNEL_NAME: {}}  # type: dict[str, dict]
 
         data_provider = {
             'With debug': {'debug': True, 'type': logging.DEBUG},
             'Without debug': {'debug': False, 'type': logging.INFO},
-        }
+        }  # type: dict[str, dict[str, typing.Any[bool, int]]]
 
         for name, data_set in data_provider.items():
             with self.subTest(f'Test create with data set "{name}"'):
@@ -895,7 +896,7 @@ class TestApplication(unittest.TestCase):
                     'headers': {'Retry-After': str(TestApplication.RETRY_AFTER)},
                 },
             },
-        }
+        }  # type: dict[str, dict[str, typing.Any[bool, dict]]]
 
         request_mock = unittest.mock.Mock(spec=Request)
         request_mock.app = self.web_app_mock
@@ -995,7 +996,7 @@ class TestApplication(unittest.TestCase):
             'no data': {'exception': mproxy.RequestParameterError, 'effect': TestApplication.MESSAGE_ERROR},
             'queue full': {'exception': mproxy.TemporaryUnawailableError, 'effect': TestApplication.QUEUE_ERROR},
             'maintenance': {'exception': mproxy.TemporaryUnawailableError, 'effect': TestApplication.MAINTENANCE},
-        }
+        }  # type: dict[str, dict[str, typing.Any[Exception, str, bool]]]
 
         message_mock = unittest.mock.Mock(spec=mproxy.Message)
         request_mock = unittest.mock.Mock(spec=Request)

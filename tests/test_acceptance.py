@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import typing
 import unittest
 import unittest.mock
 import uuid
@@ -9,6 +10,7 @@ from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, TestServer, unittest_run_loop, unused_port
 
 import mproxy
+
 from .stubs import Stub
 
 
@@ -22,8 +24,7 @@ class TestMProxy(AioHTTPTestCase):
 
     async def get_application(self) -> web.Application:
         self.port = unused_port()
-        self.outer_api_data = {}
-        self.wait_for_api = None
+        self.outer_api_data = {}  # type: dict[str, typing.Union[str, int]]
 
         async def stub_handler(request: web.Request) -> web.Response:
             data = await request.post()
@@ -121,12 +122,12 @@ class TestMProxy(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_send_message(self) -> None:
-        async def wait_for(sleep: int = 30):
+        async def wait_for(sleep: int = 30) -> None:
             await asyncio.sleep(sleep)
 
             raise AssertionError('Outer API is not done correctly')
 
-        self.wait_for_api = asyncio.create_task(wait_for())
+        self.wait_for_api = asyncio.create_task(wait_for())  # type: asyncio.Task
 
         result = await self.client.request(
                 'POST', f'/api/send/{TestMProxy.CHANNEL_NAME}',

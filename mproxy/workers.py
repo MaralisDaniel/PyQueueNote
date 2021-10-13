@@ -1,4 +1,5 @@
 import logging
+import typing
 
 import aiohttp
 
@@ -57,7 +58,7 @@ class Telegram(BaseHTTPWorker):
         self._data = {
             'chat_id': chat_id,
             'disable_notification': no_notify,
-        }
+        }  # type: dict[str, typing.Union[str, int, bool]]
 
         if parse_mode is not None and len(parse_mode) > 0:
             self._data['parse_mode'] = parse_mode

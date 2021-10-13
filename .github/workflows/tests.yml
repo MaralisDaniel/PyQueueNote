@@ -34,4 +34,3 @@ jobs:
           pipenv run python -m unittest tests.test_units
           pipenv run python -m unittest tests.test_functional
           pipenv run python -m unittest tests.test_acceptance
-
