@@ -12,6 +12,9 @@ cchardet=">=2.1.7"
 tenacity=">=8.0.1"
 
 [dev-packages]
+pytest=">=6.2"
+pytest-cov="*"
+aioresponses="*"
 
 [requires]
 python_version = "3.9"

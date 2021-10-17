@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from typing import Union
 
 from multidict import MultiDictProxy
@@ -14,6 +16,7 @@ class Message:
         self.text = text
         self.header = header
         self.payload = payload
+        self.id = uuid.uuid4()
 
     @classmethod
     def extract_from_request_data(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import logging
 import typing
 
@@ -69,6 +70,11 @@ class VirtualChannel:
         self.queue = queue
         self.task = None  # type: typing.Union[None, asyncio.Task]
 
+        self.messages_send = 0
+        self.messages_rejected = 0
+        self.processing_message = None
+        self.last_error = None
+
         self._log_type = logger
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
@@ -82,17 +88,29 @@ class VirtualChannel:
         self._log.info('Activating %s virtual channel', self.name)
 
         self.task = asyncio.create_task(self.assign_worker())
+
+        self.messages_send = 0
+        self.messages_rejected = 0
+        self.processing_message = None
+        self.last_error = None
+
         self._log.debug('Channel active')
 
     async def deactivate(self, *args) -> None:
         if self.task is None:
-            raise RequestExecutionError('Virtual channel is not running')
+            return
 
         self._log.info('Deactivating %s virtual channel', self.name)
 
         self.task.cancel()
 
         self.task = None
+
+        self._log.info(
+                'Total messages send: %d, %d was rejected',
+                self.messages_send + self.messages_rejected,
+                self.messages_rejected,
+        )
 
         self._log.debug('Channel inactive')
 
@@ -108,22 +126,65 @@ class VirtualChannel:
 
         while True:
             try:
-                await execute(await self.queue.get_task())
+                task = await self.queue.get_task()
+
+                self.processing_message = task.id
+
+                await execute(task)
+
+                self.messages_send += 1
             except asyncio.CancelledError:
                 self._log.info(f'Execution of worker in {self.name} was stopped')
+                self._set_last_error('Worker was stopped')
+
+                if self.processing_message is not None:
+                    self.messages_rejected += 1
 
                 break
             except WorkerExecutionError as e:
+                self._set_last_error(repr(e))
+                self.messages_rejected += 1
+
                 self._log.error('Request in %s is rejected: %s', self.name, repr(e))
             except WorkerAwaitError as e:
+                self._set_last_error(repr(e))
+                self.messages_rejected += 1
+
                 self._log.warning('Request in %s has failed: %s', self.name, repr(e))
             except Exception as e:
+                self._set_last_error(repr(e))
+                self.messages_rejected += 1
+
                 self._log.warning(
                         'Unknown exception is raised in %s worker operating cycle: %s, %s',
                         self.name,
                         e.__class__.__name__,
                         repr(e),
                 )
+            finally:
+                self.processing_message = None
+
+    def get_state(self):
+        return {
+            'was_send': self.messages_send,
+            'was_rejected': self.messages_rejected,
+            'current_task': self.processing_message,
+        }
+
+    def get_last_error(self, clear=False):
+        error = self.last_error
+
+        if clear:
+            self.last_error = None
+
+        return error
+
+    def _set_last_error(self, reason):
+        self.last_error = {
+            'reason': reason,
+            'stamp': datetime.now().strftime('%d.%m.%Y %H:%M:%S'),
+            'message': self.processing_message,
+        }
 
     @classmethod
     def create_from_config(

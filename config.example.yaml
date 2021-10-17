@@ -1,8 +1,20 @@
 stub:
   worker: Stub
   queue: AIOQueue
-  queue_size: 150
-  queue_full_timeout: 30
+  queue_size: 5
+  minRetryAfter: 1,
+  maxRetryAfter: 15,
+  retryBase: 2,
   params:
     min_delay: 1
     max_delay: 5
+telegram:
+  worker: Telegram
+  queue: AIOQueue
+  queue_size: 1000
+  params:
+    url: 'http://example.com/'
+    bot_id: '5213481236:aVTIwatL5wOMwQVfrOdLw9NgSAABBgEO-Ge'
+    chat_id: 5123495312
+    parse_mode:
+    no_notify: True

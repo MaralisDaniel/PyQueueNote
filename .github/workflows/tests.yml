@@ -31,6 +31,4 @@ jobs:
 
       - name: Run tests in order units, functional, acceptance
         run: |
-          pipenv run python -m unittest tests.test_units
-          pipenv run python -m unittest tests.test_functional
-          pipenv run python -m unittest tests.test_acceptance
+          pipenv run pytest tests -vv
