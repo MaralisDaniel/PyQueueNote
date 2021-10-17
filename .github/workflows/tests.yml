@@ -27,7 +27,7 @@ jobs:
           python --version
           python -m pip install pip --upgrade
           pip install pipenv --no-cache-dir
-          pipenv sync
+          pipenv sync --dev
 
       - name: Run tests in order units, functional, acceptance
         run: |
