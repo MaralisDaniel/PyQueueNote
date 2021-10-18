@@ -29,6 +29,6 @@ jobs:
           pip install pipenv --no-cache-dir
           pipenv sync --dev
 
-      - name: Run tests in order units, functional, acceptance
+      - name: Run tests
         run: |
           pipenv run pytest tests -vv --cov=mproxy --cov-report term

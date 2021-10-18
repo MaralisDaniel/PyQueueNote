@@ -53,7 +53,7 @@ class TestMProxy(AioHTTPTestCase):
     TEST_MESSAGE = 'My test message for outer API'
     HOST = 'http://example.com/'
 
-    ACCEPTABLE_DIFF = 0.15
+    ACCEPTABLE_DIFF = 0.25
     ROUND_TO = 6
 
     async def get_application(self) -> Application:
@@ -224,7 +224,7 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(result.status, 200)
         self.assertEqual(await result.json(), {'status': 'success'})
 
-        await asyncio.sleep(7)
+        await asyncio.sleep(7.5)
 
         state = self.web_app.channels[TestMProxy.STUB_CHANNEL_NAME].get_state()
 
