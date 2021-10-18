@@ -128,17 +128,12 @@ class VirtualChannel:
             try:
                 task = await self.queue.get_task()
 
-                self.processing_message = task.id
-
                 await execute(task)
 
                 self.messages_send += 1
             except asyncio.CancelledError:
                 self._log.info(f'Execution of worker in {self.name} was stopped')
                 self._set_last_error('Worker was stopped')
-
-                if self.processing_message is not None:
-                    self.messages_rejected += 1
 
                 break
             except WorkerExecutionError as e:
@@ -161,14 +156,11 @@ class VirtualChannel:
                         e.__class__.__name__,
                         repr(e),
                 )
-            finally:
-                self.processing_message = None
 
     def get_state(self):
         return {
             'was_send': self.messages_send,
             'was_rejected': self.messages_rejected,
-            'current_task': self.processing_message,
         }
 
     def get_last_error(self, clear=False):

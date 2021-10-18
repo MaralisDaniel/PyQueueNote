@@ -1,1 +1,1 @@
-from .stubs import Stub
+from .stubs import Stub, StubScenarioInterface

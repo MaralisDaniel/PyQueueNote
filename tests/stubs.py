@@ -1,11 +1,18 @@
 import asyncio
 import logging
 import random
-import typing
 
 import mproxy
 
 DEFAULT_LOGGER_NAME = 'stubs.worker'
+
+
+class StubScenarioInterface:
+    def __call__(self, message_id: str):
+        raise NotImplementedError()
+
+    def reset_scenario(self):
+        raise NotImplementedError()
 
 
 class Stub(mproxy.WorkerInterface):
@@ -17,8 +24,8 @@ class Stub(mproxy.WorkerInterface):
             max_delay: int = 5,
             delay_chance: int = 20,
             error_chance: int = 5,
-            coin_scenario: typing.Iterator = None,
-            delay_scenario: typing.Iterator = None,
+            scenario: StubScenarioInterface = None,
+            reset_scenario: bool = False,
             logger: logging.Logger = None,
     ) -> None:
         self.channel = channel
@@ -27,8 +34,8 @@ class Stub(mproxy.WorkerInterface):
         self._max_delay = max_delay
         self._error_chance = error_chance
         self._delay_chance = delay_chance
-        self.coin_scenario = coin_scenario
-        self.delay_scenario = delay_scenario
+        self.scenario = scenario
+        self.reset_scenario = reset_scenario
 
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
@@ -38,17 +45,14 @@ class Stub(mproxy.WorkerInterface):
 
         self._log.debug('Sleeping for %d', delay)
 
-        if self.coin_scenario is not None:
+        if self.scenario is not None:
             try:
-                coin = next(self.coin_scenario)
+                delay, coin = self.scenario(message.id)
             except StopIteration:
-                pass
+                if self.reset_scenario:
+                    self.scenario.reset_scenario()
 
-        if self.delay_scenario is not None:
-            try:
-                delay = next(self.delay_scenario)
-            except StopIteration:
-                pass
+                    delay, coin = self.scenario(message.id)
 
         await asyncio.sleep(delay)
 
