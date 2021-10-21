@@ -165,13 +165,12 @@ class VirtualChannel:
                 self._messages_rejected += 1
 
                 self._log.error(
-                        'Unknown exception is raised in %s worker operating cycle: %s, %s',
+                        'Unknown exception is raised in %s worker operating cycle',
                         self._name,
-                        e.__class__.__name__,
-                        repr(e),
+                        exc_info=True,
                 )
 
-                raise e
+                raise
 
     def get_state(self):
         return {
