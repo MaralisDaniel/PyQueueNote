@@ -9,8 +9,6 @@ from .exceptions import RequestParameterError
 
 
 class BaseMessage:
-    FIELDS = ('text', 'header', 'payload')
-
     def __init__(self, *, message: str = None, delay: int = None, params: dict = None):
         self.message = message
         self.params = params or {}
