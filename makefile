@@ -1,16 +1,19 @@
 setup:
 	@pip install --upgrade pip --no-cache-dir
-	@pip install pipenv --user --no-cache-dir
-	@pipenv sync
+	@pip install -r requirements.txt --user --no-cache-dir
+
+setup-dev:
+	@pip install --upgrade pip --no-cache-dir
+	@pip install -r requirements-dev.txt --user --no-cache-dir
 
 run-dev:
-	@pipenv run python3 main.py -d
+	@python3 main.py -d
 
-run-prod:
-	@pipenv run python3 main.py -c='config.yaml'
+run:
+	@python3 main.py -c='config.yaml'
 
 help:
-	@pipenv run python3 main.py -h
+	@python3 main.py -h
 
 test:
-	@pipenv run python3 -m unittest
+	@python3 -m pytest tests -vv --cov=mproxy --cov-report term

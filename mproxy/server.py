@@ -4,7 +4,7 @@ import typing
 from aiohttp import web
 
 from .exceptions import RequestParameterError, TemporaryUnawailableError
-from .model import Message
+from .model import BaseMessage
 from .vchannel import VirtualChannel
 
 DEFAULT_RETRY_AFTER = 120
@@ -47,16 +47,12 @@ class Application:
         self.config = config
         self.channels = {}  # type: dict[str, VirtualChannel]
 
-        self.app[Application.MAINTENANCE_KEY] = True
-
-        self._log.debug('Setting routing and middlewares')
+        self.app[self.MAINTENANCE_KEY] = True
 
         self.app.middlewares.append(self.handle_errors_middleware)
         self.app.router.add_route('GET', '/api/ping', self.ping)
         self.app.router.add_route('POST', r'/api/send/{v_channel:[\w\-]{4,24}}', self.send_message)
-
-        self._log.debug('Setting startup and shutdown events')
-        self._log.debug('Preparing virtual channels configuration')
+        self.app.router.add_route('GET', r'/api/stat/{v_channel:[\w\-]{4,24}}', self.get_channel_stat)
 
         for name, channel_config in self.config.items():
             self._log.debug('Registering channel %s', name)
@@ -70,12 +66,10 @@ class Application:
             self.app.on_startup.append(self.channels[name].activate)
             self.app.on_shutdown.append(self.channels[name].deactivate)
 
-        self._log.info('Application is ready to operate')
-
     def run(self) -> None:
         self._log.debug('Starting app')
 
-        self.app[Application.MAINTENANCE_KEY] = False
+        self.app[self.MAINTENANCE_KEY] = False
 
         self._log.debug('Run web app at %s:%d', self.host, self.port)
 
@@ -84,43 +78,49 @@ class Application:
         self._log.debug('App terminated')
 
     async def send_message(self, request: web.Request) -> web.Response:
-        if request.app[Application.MAINTENANCE_KEY]:
+        if self.app[Application.MAINTENANCE_KEY]:
             raise TemporaryUnawailableError('Service is temporary unawailable')
 
         channel = request.match_info.get('v_channel')
-        self._log.debug('Channel selected: %s', channel)
-
         v_channel = self.channels.get(channel)
 
         if v_channel is None:
-            self._log.warning('Request to unknown channel %s', channel)
+            self._log.error('Request to unknown channel %s', channel)
 
             raise RequestParameterError(f'Unknown channel {channel}')
 
         if not v_channel.is_running:
-            self._log.warning('Request in channel that is not active')
+            self._log.error('Request in channel that is not active')
 
             raise TemporaryUnawailableError('Channel is not available for now')
 
-        data = await request.post()
-
-        delay = int(data.get('delay', '0'))
-        self._log.debug('Request parameter delay is read: %d', delay)
-
-        message = Message.extract_from_request_data(data)
-        self._log.debug('Request parameter message is read: %s', message)
-
-        v_channel.get_queue().add_task(message, delay)
-
-        self._log.debug('Request completed')
+        v_channel.add_message(BaseMessage.extract_from_request_data(await request.json()))
 
         return web.json_response({'status': 'success'})
 
     async def ping(self, request: web.Request) -> web.Response:
-        if request.app[Application.MAINTENANCE_KEY]:
+        if self.app[self.MAINTENANCE_KEY]:
             return web.Response(status=503, text='FAIL', headers={'Retry-After': str(self.retry_after)})
 
         return web.Response(text='OK')
+
+    async def get_channel_stat(self, request: web.Request) -> web.Response:
+        if self.app[Application.MAINTENANCE_KEY]:
+            raise TemporaryUnawailableError('Service is temporary unawailable')
+
+        channel = request.match_info.get('v_channel')
+        v_channel = self.channels.get(channel)
+
+        if v_channel is None:
+            self._log.error('Request to unknown channel %s', channel)
+
+            raise RequestParameterError(f'Unknown channel {channel}')
+
+        return web.json_response({
+            'channel_stat': v_channel.get_state(),
+            'is_running': v_channel.is_running,
+            'last_error': v_channel.get_last_error(),
+        })
 
     @web.middleware
     async def handle_errors_middleware(self, request: web.Request, handler: typing.Callable) -> web.Response:

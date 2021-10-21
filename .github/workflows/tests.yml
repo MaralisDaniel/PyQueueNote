@@ -26,9 +26,8 @@ jobs:
         run: |
           python --version
           python -m pip install pip --upgrade
-          pip install pipenv --no-cache-dir
-          pipenv sync --dev
+          pip install -r requirements-dev.txt --no-cache-dir
 
       - name: Run tests
         run: |
-          pipenv run pytest tests -vv --cov=mproxy --cov-report term
+          python -m pytest tests -vv --cov=mproxy --cov-report term

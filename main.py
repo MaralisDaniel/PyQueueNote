@@ -7,6 +7,10 @@ import mproxy
 from tests.stubs import Stub
 
 
+QUEUES = {'AIOQueue': mproxy.queues.AIOQueue}
+WORKERS = {'Stub': Stub, 'Telegram': mproxy.workers.Telegram}
+
+
 class ArgParser(argparse.ArgumentParser):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -48,10 +52,48 @@ class ArgParser(argparse.ArgumentParser):
                 dest='debug',
         )
 
+        self.add_argument(
+                '--show_queues',
+                help='List available queue names which could be used in config file and exit',
+                action='store_true',
+                dest='queues',
+        )
+
+        self.add_argument(
+                '--show_workers',
+                help='List available workers names which could be used in config file and exit',
+                action='store_true',
+                dest='workers',
+        )
+
     def error(self, message: str):
         self._print_message(f'{self.prog} - error: {message}')
         self.print_help()
         self.exit(2)
+
+
+def show_available_workers():
+    print('Available workers:', '')
+
+    for name, worker in WORKERS.items():
+        print(name)
+
+        if worker.__doc__:
+            print(worker.__doc__, '')
+        else:
+            print('No description for this worker', '')
+
+
+def show_available_queues():
+    print('Available queues')
+
+    for name, queue in QUEUES.items():
+        print(name)
+
+        if queue.__doc__:
+            print(queue.__doc__, '')
+        else:
+            print('No description for this queue', '')
 
 
 def main() -> None:
@@ -61,14 +103,23 @@ def main() -> None:
             epilog='Note: all of those arguments has its defaults',
     ).parse_args()
 
+    if args.workers:
+        show_available_workers()
+
+    if args.queues:
+        show_available_queues()
+
+    if args.queues or args.workers:
+        exit(0)
+
     config = yaml.safe_load(args.config)
 
     args.config.close()
 
     app = mproxy.Application(
             web.Application(),
-            {'AIOQueue': mproxy.queues.AIOQueue},
-            {'Stub': Stub, 'Telegram': mproxy.workers.Telegram},
+            QUEUES,
+            WORKERS,
             host=args.host,
             port=args.port,
             config=config,

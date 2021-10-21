@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import uuid
 
 import mproxy
 
@@ -8,7 +9,7 @@ DEFAULT_LOGGER_NAME = 'stubs.worker'
 
 
 class StubScenarioInterface:
-    def __call__(self, message_id: str):
+    def __call__(self, message_id: uuid.UUID):
         raise NotImplementedError()
 
     def reset_scenario(self):
@@ -16,6 +17,15 @@ class StubScenarioInterface:
 
 
 class Stub(mproxy.WorkerInterface):
+    """
+    Stub worker is a testing instrument - it allows you to test service and watch for worker activity in logs
+    It is expecting next params (optional, may be listed in 'params' array in the config file):
+        min_delay - minimal amount of seconds before emulate message delivery
+        max_delay - maximum amount of seconds before emulate message delivery
+        delay_chance - chance that message delivery will fail and it is possible to retry it
+        error_chance - chance that message delivery will fail and it is useless to retry it
+    """
+
     def __init__(
             self,
             channel: str,
@@ -39,7 +49,7 @@ class Stub(mproxy.WorkerInterface):
 
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
-    async def operate(self, message: mproxy.Message) -> None:
+    async def operate(self, message: mproxy.BaseMessage) -> None:
         delay = random.randint(self._min_delay, self._max_delay)
         coin = random.randint(0, 100)
 

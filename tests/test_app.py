@@ -5,27 +5,65 @@ import random
 import unittest
 import unittest.mock
 import uuid
+from collections import namedtuple
 
-from aiohttp.web import Application
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+from aiohttp.web import Application
 from aioresponses import aioresponses
-from yarl import URL
 
 import mproxy
-
 from tests import Stub, StubScenarioInterface
+
+RequestCall = namedtuple('RequestCall', ['args', 'kwargs'])
+
+HOST = 'http://example.com/'
+IGNORE_HOSTS = ['http://127.0.0.1', 'http://127.0.1.1', 'http://localhost']
+TEST_CHANNEL_NAME = 'TestChannel'
+STUB_CHANNEL_NAME = 'StubChannel'
+
+
+def get_app_config(bot_id: str, chat_id: int, scenario: StubScenarioInterface) -> dict:
+    return {
+            TEST_CHANNEL_NAME: {
+                'queue': {
+                    'name': 'AIOQueue',
+                    'queue_size': 10,
+                },
+                'worker': {
+                    'name': 'Telegram',
+                    'url': HOST,
+                    'bot_id': bot_id,
+                    'chat_id': chat_id,
+                },
+            },
+            STUB_CHANNEL_NAME: {
+                'worker': {
+                    'name': 'Stub',
+                    'min_delay': 1,
+                    'max_delay': 5,
+                    'scenario': scenario,
+                },
+                'queue': {
+                    'name': 'AIOQueue',
+                    'queue_size': 3,
+                },
+                'minRetryAfter': 0,
+                'maxRetryAfter': 10,
+                'retryBase': 1.5,
+            },
+    }
 
 
 class StubScenario(StubScenarioInterface):
     def __init__(self, coin: list, delay: list):
-        self.calls = {}  # type: dict[str, list]
+        self.calls = {}  # type: dict[uuid.UUID, list]
         self._coin = coin
         self._delay = delay
 
         self.coins = iter(coin)
         self.delays = iter(delay)
 
-    def __call__(self, message_id: str):
+    def __call__(self, message_id: uuid.UUID):
         delay = next(self.delays)
         coin = next(self.coins)
 
@@ -48,58 +86,27 @@ class TestMProxy(AioHTTPTestCase):
     VALIDATION_ERROR_CODE = 422
     TEMPORARY_UNAWAILABLE_CODE = 503
 
-    TEST_CHANNEL_NAME = 'TestChannel'
-    STUB_CHANNEL_NAME = 'StubChannel'
     TEST_MESSAGE = 'My test message for outer API'
-    HOST = 'http://example.com/'
 
-    ACCEPTABLE_DIFF = 0.25
-    ROUND_TO = 6
+    ROUND_TO = 0
+    FEW_MESSAGES_COUNT = 5
 
     async def get_application(self) -> Application:
         self.logger = unittest.mock.Mock(spec=logging.Logger)
-
         self.chat_id = random.randint(100000, 1000000000)
         self.bot_id = f'{random.randint(100000000, 1000000000)}:{uuid.uuid4().hex}'
         self.no_notify = False
         self.scenario_mock = StubScenario([10, 15, 50], [1, 1, 1])
 
-        config = {
-            TestMProxy.TEST_CHANNEL_NAME: {
-                'worker': 'Telegram',
-                'queue': 'AIOQueue',
-                'queue_size': 10,
-                'params': {
-                    'url': TestMProxy.HOST,
-                    'bot_id': self.bot_id,
-                    'chat_id': self.chat_id,
-                    'no_notify': self.no_notify,
-                },
-            },
-            TestMProxy.STUB_CHANNEL_NAME: {
-                'worker': 'Stub',
-                'queue': 'AIOQueue',
-                'queue_size': 3,
-                'minRetryAfter': 0,
-                'maxRetryAfter': 10,
-                'retryBase': 1.5,
-                'params': {
-                    'min_delay': 1,
-                    'max_delay': 5,
-                    'scenario': self.scenario_mock,
-                },
-            },
-        }
-
         self.web_app = mproxy.Application(
                 Application(),
                 {'AIOQueue': mproxy.queues.AIOQueue},
                 {'Stub': Stub, 'Telegram': mproxy.workers.Telegram},
-                host=TestMProxy.HOST,
+                host=HOST,
                 port=random.randint(0, 65535),
                 debug=False,
                 logger=self.logger,
-                config=config,
+                config=get_app_config(self.bot_id, self.chat_id, self.scenario_mock),
         )
 
         if 'maintenance' not in self.id().split('.').pop():
@@ -126,11 +133,11 @@ class TestMProxy(AioHTTPTestCase):
                     'type': 'private',
                 },
                 'date': random.randint(1633973467, 1634973467),
-                'text': TestMProxy.TEST_MESSAGE,
+                'text': self.TEST_MESSAGE,
             },
         }
 
-        self.url = f'{TestMProxy.HOST}bot{self.bot_id}/sendMessage'
+        self.url = f'{HOST}bot{self.bot_id}/sendMessage'
 
     @unittest_run_loop
     async def test_can_ping_in_normal_conditions(self) -> None:
@@ -141,7 +148,7 @@ class TestMProxy(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_can_send_message_in_normal_conditions(self) -> None:
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=200,
@@ -150,8 +157,12 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                    data={'text': TestMProxy.TEST_MESSAGE},
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
             )
 
             await asyncio.sleep(0.5)
@@ -159,28 +170,24 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(result.status, 200)
         self.assertEqual(await result.json(), {'status': 'success'})
 
-        state = mock.requests.get(('POST', URL(self.url)))
-
-        self.assertIsNotNone(state)
-        self.assertDictEqual(
-                state[0].kwargs,
-                {
-                    'data': {
-                        'text': TestMProxy.TEST_MESSAGE,
-                        'chat_id': self.chat_id,
-                        'disable_notification': self.no_notify,
-                    },
+        self.check_request_count(mock.requests)
+        self.check_request_calls(
+            mock.requests, {
+                'data': {
+                    'text': self.TEST_MESSAGE,
+                    'chat_id': self.chat_id,
+                    'disable_notification': self.no_notify,
                 },
+            },
         )
 
     @unittest_run_loop
     async def test_can_send_few_messages_in_normal_conditions(self) -> None:
-        actual_calls = []
         expected_calls = []
 
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
-            for number in range(0, 4):
-                message = f'{TestMProxy.TEST_MESSAGE} - {number}'
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
+            for number in range(0, self.FEW_MESSAGES_COUNT):
+                message = f'{self.TEST_MESSAGE} - {number}'
 
                 mock.post(
                         self.url,
@@ -190,8 +197,12 @@ class TestMProxy(AioHTTPTestCase):
                 )
 
                 result = await self.client.request(
-                        'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                        data={'text': message},
+                        'POST',
+                        f'/api/send/{TEST_CHANNEL_NAME}',
+                        json={
+                            'message': f'{self.TEST_MESSAGE} - {number}',
+                            'params': {'disable_notification': self.no_notify},
+                        },
                 )
 
                 self.assertEqual(result.status, 200)
@@ -207,18 +218,20 @@ class TestMProxy(AioHTTPTestCase):
 
             await asyncio.sleep(1)
 
-        state = mock.requests.get(('POST', URL(self.url)))
+        self.check_request_count(mock.requests, request_per_url_count=self.FEW_MESSAGES_COUNT)
 
-        for call in range(0, 4):
-            actual_calls.append(state[call].kwargs)
-
-        self.assertListEqual(actual_calls, expected_calls)
+        for call in range(0, self.FEW_MESSAGES_COUNT):
+            self.check_request_calls(mock.requests, expected_calls[call], call_key=call)
 
     @unittest_run_loop
     async def test_can_retry_to_send_message_with_delay(self) -> None:
         result = await self.client.request(
-                'POST', f'/api/send/{TestMProxy.STUB_CHANNEL_NAME}',
-                data={'text': TestMProxy.TEST_MESSAGE},
+                'POST',
+                f'/api/send/{STUB_CHANNEL_NAME}',
+                json={
+                    'message': self.TEST_MESSAGE,
+                    'params': {'disable_notification': self.no_notify},
+                },
         )
 
         self.assertEqual(result.status, 200)
@@ -226,7 +239,7 @@ class TestMProxy(AioHTTPTestCase):
 
         await asyncio.sleep(7.5)
 
-        state = self.web_app.channels[TestMProxy.STUB_CHANNEL_NAME].get_state()
+        state = self.web_app.channels[STUB_CHANNEL_NAME].get_state()
 
         self.assertEqual(state['was_send'], 1)
         self.assertEqual(state['was_rejected'], 0)
@@ -237,20 +250,13 @@ class TestMProxy(AioHTTPTestCase):
         first_delay = calls[1] - calls[0]  # type: datetime.timedelta
         second_delay = calls[2] - calls[1]  # type: datetime.timedelta
 
-        self.assertLess(
-                round((first_delay.seconds + first_delay.microseconds / 1000000) - 2.5, TestMProxy.ROUND_TO),
-                TestMProxy.ACCEPTABLE_DIFF,
-        )
-
-        self.assertLess(
-                round((second_delay.seconds + second_delay.microseconds / 1000000) - 3.25, TestMProxy.ROUND_TO),
-                TestMProxy.ACCEPTABLE_DIFF,
-        )
+        self.assertAlmostEqual((first_delay.seconds + first_delay.microseconds / 1000000), 2.5, self.ROUND_TO)
+        self.assertAlmostEqual((second_delay.seconds + second_delay.microseconds / 1000000), 3.25, self.ROUND_TO)
 
     @unittest_run_loop
     async def test_can_show_channel_stat(self) -> None:
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
-            for _ in range(0, 5):
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
+            for _ in range(0, self.FEW_MESSAGES_COUNT):
                 mock.post(
                         self.url,
                         status=200,
@@ -259,20 +265,30 @@ class TestMProxy(AioHTTPTestCase):
                 )
 
                 await self.client.request(
-                        'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                        data={'text': TestMProxy.TEST_MESSAGE},
+                        'POST',
+                        f'/api/send/{TEST_CHANNEL_NAME}',
+                        json={
+                            'message': self.TEST_MESSAGE,
+                            'params': {'disable_notification': self.no_notify},
+                        },
                 )
 
         await asyncio.sleep(0.5)
 
-        state = self.web_app.channels[TestMProxy.TEST_CHANNEL_NAME].get_state()
+        state = await self.client.request('GET', f'/api/stat/{TEST_CHANNEL_NAME}')
 
-        self.assertEqual(state['was_send'], 5)
-        self.assertEqual(state['was_rejected'], 0)
+        self.assertDictEqual(
+                await state.json(),
+                {
+                    'channel_stat': {'was_send': self.FEW_MESSAGES_COUNT, 'was_rejected': 0},
+                    'is_running': True,
+                    'last_error': None,
+                },
+        )
 
     @unittest_run_loop
     async def test_can_reject_undeliverable_message(self) -> None:
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=400,
@@ -281,8 +297,12 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                    data={'text': TestMProxy.TEST_MESSAGE},
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
             )
 
         await asyncio.sleep(0.5)
@@ -290,28 +310,26 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(result.status, 200)
         self.assertEqual(await result.json(), {'status': 'success'})
 
-        state = mock.requests.get(('POST', URL(self.url)))
-
-        self.assertIsNotNone(state)
-        self.assertDictEqual(
-                state[0].kwargs,
+        self.check_request_count(mock.requests)
+        self.check_request_calls(
+                mock.requests,
                 {
                     'data': {
-                        'text': TestMProxy.TEST_MESSAGE,
+                        'text': self.TEST_MESSAGE,
                         'chat_id': self.chat_id,
                         'disable_notification': self.no_notify,
                     },
                 },
         )
 
-        channel_state = self.web_app.channels[TestMProxy.TEST_CHANNEL_NAME].get_state()
+        channel_state = self.web_app.channels[TEST_CHANNEL_NAME].get_state()
 
         self.assertEqual(channel_state['was_send'], 0)
         self.assertEqual(channel_state['was_rejected'], 1)
 
     @unittest_run_loop
     async def test_can_reject_empty_message(self) -> None:
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=200,
@@ -320,8 +338,9 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                    data={},
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={},
             )
 
         await asyncio.sleep(0.1)
@@ -333,9 +352,9 @@ class TestMProxy(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_can_reject_send_message_in_inactive_channel(self) -> None:
-        await self.web_app.channels[TestMProxy.TEST_CHANNEL_NAME].deactivate(self.web_app.app)
+        await self.web_app.channels[TEST_CHANNEL_NAME].deactivate(self.web_app.app)
 
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=200,
@@ -344,8 +363,12 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                    data={},
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
             )
 
         await asyncio.sleep(0.1)
@@ -359,7 +382,7 @@ class TestMProxy(AioHTTPTestCase):
     async def test_can_reject_send_message_non_exists_channel(self) -> None:
         channel = 'some_channel'
 
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=200,
@@ -368,23 +391,28 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{channel}',
-                    data={},
+                    'POST',
+                    f'/api/send/{channel}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
             )
 
         await asyncio.sleep(0.1)
 
-        self.assertEqual(result.status, TestMProxy.VALIDATION_ERROR_CODE)
+        self.assertEqual(result.status, self.VALIDATION_ERROR_CODE)
         self.assertEqual(await result.json(), {'status': 'error', 'error': f'Unknown channel {channel}'})
 
         self.assertDictEqual(mock.requests, {})
 
     @unittest_run_loop
     async def test_can_reject_to_send_message_with_full_queue(self) -> None:
-        for _ in range(0, 5):
+        for _ in range(0, self.FEW_MESSAGES_COUNT):
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.STUB_CHANNEL_NAME}',
-                    data={'text': TestMProxy.TEST_MESSAGE},
+                    'POST',
+                    f'/api/send/{STUB_CHANNEL_NAME}',
+                    json={'message': self.TEST_MESSAGE},
             )
 
         self.assertEqual(result.status, 503)
@@ -395,7 +423,7 @@ class TestMProxy(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_can_reject_to_send_message_in_maintenance_mode(self) -> None:
-        with aioresponses(passthrough=['http://127.0.0.1']) as mock:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=200,
@@ -404,8 +432,12 @@ class TestMProxy(AioHTTPTestCase):
             )
 
             result = await self.client.request(
-                    'POST', f'/api/send/{TestMProxy.TEST_CHANNEL_NAME}',
-                    data={'text': TestMProxy.TEST_MESSAGE},
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
             )
 
         await asyncio.sleep(0.1)
@@ -421,6 +453,17 @@ class TestMProxy(AioHTTPTestCase):
 
         self.assertEqual(result.status, 503)
         self.assertEqual(await result.text(), 'FAIL')
+
+    def check_request_count(self, requests: dict, *, unique_url_count: int = 1, request_per_url_count: int = 1) -> None:
+        self.assertEqual(len(requests), unique_url_count)
+
+        for request_per_url in requests.values():
+            self.assertEqual(len(request_per_url), request_per_url_count)
+
+    def check_request_calls(self, requests: dict, data: dict, *, url_key: tuple = None, call_key: int = 0) -> None:
+        request_calls = requests[url_key] if url_key else [*requests.values()][0]  # type: list[RequestCall]
+
+        self.assertDictEqual(request_calls[call_key].kwargs, data)
 
 
 if __name__ == '__main__':

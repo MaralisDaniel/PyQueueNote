@@ -1,10 +1,9 @@
 import logging
-import typing
 
 import aiohttp
 
 from .exceptions import WorkerAwaitError, WorkerExecutionError
-from .model import Message
+from .model import BaseMessage
 
 CLIENT_TOTAL_TIMEOUT = 30
 DEFAULT_LOGGER_NAME = 'm-proxy.worker'
@@ -12,17 +11,16 @@ DEFAULT_LOGGER_NAME = 'm-proxy.worker'
 
 # Interface for any custom worker
 class WorkerInterface:
-    async def operate(self, message: Message) -> None:
-        raise NotImplementedError()
+    async def operate(self, message: BaseMessage) -> None: ...
 
 
-class BaseHTTPWorker(WorkerInterface):
+class BaseHTTPWorker:
     def __init__(self, url: str, method: str) -> None:
         self._url = url
         self._method = method
         self._timeout = aiohttp.ClientTimeout(CLIENT_TOTAL_TIMEOUT)
 
-    async def operate(self, message: Message) -> None:
+    async def operate(self, message: BaseMessage) -> None:
         raise NotImplementedError()
 
     async def execute_query(self, data: dict = None) -> dict:
@@ -40,6 +38,14 @@ class BaseHTTPWorker(WorkerInterface):
 
 # Default workers
 class Telegram(BaseHTTPWorker):
+    """
+    Telegram worker performs requests to Telegram API (sendMessage method)
+    It is expecting next params (must be listed in 'worker' array in the config file):
+        url - host or domain name of Telegram API server (allows you to use worker with local API server)
+        bot_id - id of the bot you are using to send messages (this id you will receive after Telegram bot is created)
+        chat_id - id of chat where to send message (your bot must be in this chat)
+    """
+
     def __init__(
             self,
             channel: str,
@@ -47,27 +53,18 @@ class Telegram(BaseHTTPWorker):
             url: str,
             chat_id: int,
             bot_id: str,
-            no_notify: bool = False,
-            parse_mode: str = None,
             logger: logging.Logger = None,
     ) -> None:
         super().__init__(f"{url.rstrip('/')}/bot{bot_id}/sendMessage", 'POST')
 
         self.channel = channel
 
-        self._data = {
-            'chat_id': chat_id,
-            'disable_notification': no_notify,
-        }  # type: dict[str, typing.Union[str, int, bool]]
-
-        if parse_mode is not None and len(parse_mode) > 0:
-            self._data['parse_mode'] = parse_mode
+        self._data = {'chat_id': chat_id}
 
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
-    async def operate(self, message: Message) -> None:
-        self._log.debug('Perform request')
-        response = await self.execute_query({'text': message.text, **self._data})
+    async def operate(self, message: BaseMessage) -> None:
+        response = await self.execute_query({'text': message.message, **message.params, **self._data})
 
         if response['data'].get('ok', False):
             self._log.info(
@@ -77,13 +74,6 @@ class Telegram(BaseHTTPWorker):
             )
         else:
             reason = response.get('data', {}).get('description')
-
-            self._log.warning(
-                    'Channel %s declined the message, status: %d, reason: %s',
-                    self.channel,
-                    response['status'],
-                    reason,
-            )
 
             if response['status'] == 503:
                 retry_after = response.get('data', {}).get('retry_after', response['retry-after'])
