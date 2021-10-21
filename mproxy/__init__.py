@@ -1,7 +1,5 @@
-from .exceptions import (
-    MProxyException, RequestExecutionError, RequestParameterError, TemporaryUnawailableError,
-    WorkerAwaitError, WorkerExecutionError,
-)
+from .exceptions import (MProxyException, RequestExecutionError, RequestParameterError, TemporaryUnawailableError,
+                         WorkerAwaitError, WorkerExecutionError)
 from .model import BaseMessage
 from .queues import AIOQueue, QueueInterface
 from .server import Application

@@ -6,7 +6,6 @@ from aiohttp import web
 import mproxy
 from tests.stubs import Stub
 
-
 QUEUES = {'AIOQueue': mproxy.queues.AIOQueue}
 WORKERS = {'Stub': Stub, 'Telegram': mproxy.workers.Telegram}
 

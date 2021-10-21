@@ -31,7 +31,7 @@ class BaseHTTPWorker:
                 if response.content_type == 'application/json':
                     result['data'] = await response.json()
                 else:
-                    result['data'] = response.text()
+                    result['data'] = await response.text()
 
                 return result
 

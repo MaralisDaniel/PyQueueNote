@@ -24,33 +24,33 @@ STUB_CHANNEL_NAME = 'StubChannel'
 
 def get_app_config(bot_id: str, chat_id: int, scenario: StubScenarioInterface) -> dict:
     return {
-            TEST_CHANNEL_NAME: {
-                'queue': {
-                    'name': 'AIOQueue',
-                    'queue_size': 10,
-                },
-                'worker': {
-                    'name': 'Telegram',
-                    'url': HOST,
-                    'bot_id': bot_id,
-                    'chat_id': chat_id,
-                },
+        TEST_CHANNEL_NAME: {
+            'queue': {
+                'name': 'AIOQueue',
+                'queue_size': 10,
             },
-            STUB_CHANNEL_NAME: {
-                'worker': {
-                    'name': 'Stub',
-                    'min_delay': 1,
-                    'max_delay': 5,
-                    'scenario': scenario,
-                },
-                'queue': {
-                    'name': 'AIOQueue',
-                    'queue_size': 3,
-                },
-                'minRetryAfter': 0,
-                'maxRetryAfter': 10,
-                'retryBase': 1.5,
+            'worker': {
+                'name': 'Telegram',
+                'url': HOST,
+                'bot_id': bot_id,
+                'chat_id': chat_id,
             },
+        },
+        STUB_CHANNEL_NAME: {
+            'worker': {
+                'name': 'Stub',
+                'min_delay': 1,
+                'max_delay': 5,
+                'scenario': scenario,
+            },
+            'queue': {
+                'name': 'AIOQueue',
+                'queue_size': 3,
+            },
+            'minRetryAfter': 0,
+            'maxRetryAfter': 10,
+            'retryBase': 1.5,
+        },
     }
 
 
@@ -287,13 +287,52 @@ class TestMProxy(AioHTTPTestCase):
         )
 
     @unittest_run_loop
-    async def test_can_reject_undeliverable_message(self) -> None:
+    async def test_can_handle_undeliverable_message(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(
                     self.url,
                     status=400,
                     payload={'ok': False, 'description': 'Test failure'},
                     headers={'Content-Type': 'application/json'},
+            )
+
+            result = await self.client.request(
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
+            )
+
+        await asyncio.sleep(0.5)
+
+        self.assertEqual(result.status, 200)
+        self.assertEqual(await result.json(), {'status': 'success'})
+
+        self.check_request_count(mock.requests)
+        self.check_request_calls(
+                mock.requests,
+                {
+                    'data': {
+                        'text': self.TEST_MESSAGE,
+                        'chat_id': self.chat_id,
+                        'disable_notification': self.no_notify,
+                    },
+                },
+        )
+
+        channel_state = self.web_app.channels[TEST_CHANNEL_NAME].get_state()
+
+        self.assertEqual(channel_state['was_send'], 0)
+        self.assertEqual(channel_state['was_rejected'], 1)
+
+    @unittest_run_loop
+    async def test_can_handle_unreachable_url(self) -> None:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
+            mock.post(
+                    self.url,
+                    status=404,
             )
 
             result = await self.client.request(
