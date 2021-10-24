@@ -1,10 +1,10 @@
 stub:  # channel name
   worker:  # worker params
-    name: Stub # worker name
+    class: Stub # worker name
     min_delay: 1
     max_delay: 5
   queue:  # queue params
-    name: AIOQueue  # queue names
+    class: AIOQueue  # queue names
     queue_size: 5
   minRetryAfter: 1  # minimal delay in seconds before retry same request to outer api (in case 503 error)
   maxRetryAfter: 15  # maximum delay in seconds before retry same request to outer api (in case 503 error)
@@ -12,10 +12,10 @@ stub:  # channel name
   maxAttempts: 5  # number of attempts to send message to outer api after it will be dropped (in case 503 error)
 telegram:
   queue:
-    name: AIOQueue
+    class: AIOQueue
     queue_size: 1000
   worker:
-    name: Telegram
+    class: Telegram
     url: 'http://example.com/'
     bot_id: '5213481236:aVTIwatL5wOMwQVfrOdLw9NgSAABBgEO-Ge'
     chat_id: 5123495312

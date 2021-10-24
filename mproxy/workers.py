@@ -46,6 +46,8 @@ class Telegram(BaseHTTPWorker):
         chat_id - id of chat where to send message (your bot must be in this chat)
     """
 
+    RETRY_CODES = (408, 502, 503, 504)
+
     def __init__(
             self,
             channel: str,
@@ -65,19 +67,20 @@ class Telegram(BaseHTTPWorker):
 
     async def operate(self, message: BaseMessage) -> None:
         response = await self.execute_query({'text': message.message, **message.params, **self._data})
+        result = response['data'] or {}
 
-        if response['data'].get('ok', False):
+        if result.get('ok', False):
             self._log.info(
                     'Channel %s accepted the message, its id: %d',
                     self.channel,
                     response['data']['result']['message_id'],
             )
         else:
-            reason = response.get('data', {}).get('description')
+            reason = result.get('description', f"Not specified, code: {response['status']}")
 
-            if response['status'] == 503:
-                retry_after = response.get('data', {}).get('retry_after', response['retry-after'])
+            if response['status'] in self.RETRY_CODES:
+                retry_after = result.get('retry_after', response['retry-after'])
 
-                raise WorkerAwaitError(503, reason, retry_after)
+                raise WorkerAwaitError(response['status'], reason, retry_after)
 
             raise WorkerExecutionError(response['status'], reason)

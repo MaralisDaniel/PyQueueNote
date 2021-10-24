@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import traceback
 import typing
 from datetime import datetime, timezone
 
@@ -147,21 +148,21 @@ class VirtualChannel:
                 self._messages_send += 1
             except asyncio.CancelledError:
                 self._log.info(f'Execution of worker in {self._name} was stopped')
-                self._set_last_error('Worker was stopped')
+                self._set_last_error('Worker was stopped', traceback.format_exc())
 
                 break
             except WorkerExecutionError as e:
-                self._set_last_error(repr(e))
+                self._set_last_error(repr(e), traceback.format_exc())
                 self._messages_rejected += 1
 
                 self._log.error('Request in %s is rejected: %s', self._name, repr(e))
             except WorkerAwaitError as e:
-                self._set_last_error(repr(e))
+                self._set_last_error(repr(e), traceback.format_exc())
                 self._messages_rejected += 1
 
                 self._log.error('Request in %s has failed: %s', self._name, repr(e))
             except Exception as e:
-                self._set_last_error(repr(e))
+                self._set_last_error(repr(e), traceback.format_exc())
                 self._messages_rejected += 1
 
                 self._log.error(
@@ -186,9 +187,10 @@ class VirtualChannel:
 
         return error
 
-    def _set_last_error(self, reason):
+    def _set_last_error(self, reason: str, trace: str):
         self._last_error = {
             'reason': reason,
+            'trace': trace,
             'stamp': datetime.now().strftime('%d.%m.%Y %H:%M:%S'),
         }
 
@@ -204,8 +206,8 @@ class VirtualChannel:
         worker_config = config['worker']
         queue_config = config['queue']
 
-        worker_class = app_components['workers'][worker_config.pop('name')]
-        queue_class = app_components['queues'][queue_config.pop('name')]
+        worker_class = app_components['workers'][worker_config.pop('class')]
+        queue_class = app_components['queues'][queue_config.pop('class')]
 
         return cls(
                 name,

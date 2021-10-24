@@ -53,14 +53,14 @@ class ArgParser(argparse.ArgumentParser):
 
         self.add_argument(
                 '--show_queues',
-                help='List available queue names which could be used in config file and exit',
+                help='List available queue classes which could be used in config file and exit',
                 action='store_true',
                 dest='queues',
         )
 
         self.add_argument(
                 '--show_workers',
-                help='List available workers names which could be used in config file and exit',
+                help='List available workers classes which could be used in config file and exit',
                 action='store_true',
                 dest='workers',
         )

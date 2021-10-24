@@ -26,11 +26,11 @@ def get_app_config(bot_id: str, chat_id: int, scenario: StubScenarioInterface) -
     return {
         TEST_CHANNEL_NAME: {
             'queue': {
-                'name': 'AIOQueue',
+                'class': 'AIOQueue',
                 'queue_size': 10,
             },
             'worker': {
-                'name': 'Telegram',
+                'class': 'Telegram',
                 'url': HOST,
                 'bot_id': bot_id,
                 'chat_id': chat_id,
@@ -38,13 +38,13 @@ def get_app_config(bot_id: str, chat_id: int, scenario: StubScenarioInterface) -
         },
         STUB_CHANNEL_NAME: {
             'worker': {
-                'name': 'Stub',
+                'class': 'Stub',
                 'min_delay': 1,
                 'max_delay': 5,
                 'scenario': scenario,
             },
             'queue': {
-                'name': 'AIOQueue',
+                'class': 'AIOQueue',
                 'queue_size': 3,
             },
             'minRetryAfter': 0,
@@ -225,6 +225,44 @@ class TestMProxy(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_can_retry_to_send_message_with_delay(self) -> None:
+        with aioresponses(passthrough=IGNORE_HOSTS) as mock:
+            mock.post(
+                    self.url,
+                    status=502,
+            )
+
+            result = await self.client.request(
+                    'POST',
+                    f'/api/send/{TEST_CHANNEL_NAME}',
+                    json={
+                        'message': self.TEST_MESSAGE,
+                        'params': {'disable_notification': self.no_notify},
+                    },
+            )
+
+            await asyncio.sleep(5)
+
+            mock.post(
+                    self.url,
+                    status=200,
+                    payload=self.telegram_response,
+                    headers={'Content-Type': 'application/json'},
+            )
+
+            await asyncio.sleep(4.5)
+
+        self.assertEqual(result.status, 200)
+        self.assertEqual(await result.json(), {'status': 'success'})
+
+        self.check_request_count(mock.requests, request_per_url_count=2)
+
+        req = {'data': {'text': self.TEST_MESSAGE, 'chat_id': self.chat_id, 'disable_notification': self.no_notify}}
+
+        self.check_request_calls(mock.requests, req, call_key=0)
+        self.check_request_calls(mock.requests, req, call_key=1)
+
+    @unittest_run_loop
+    async def test_can_retry_with_exponential_delay(self) -> None:
         result = await self.client.request(
                 'POST',
                 f'/api/send/{STUB_CHANNEL_NAME}',
