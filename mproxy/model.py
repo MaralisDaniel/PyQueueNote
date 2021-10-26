@@ -1,29 +1,40 @@
 from __future__ import annotations
+
+import uuid
+from typing import Union
+
 from multidict import MultiDictProxy
 
 from .exceptions import RequestParameterError
 
 
-class Message:
-    def __init__(self, *, text=None, header=None, payload=None):
-        self.text = text
-        self.header = header
-        self.payload = payload
+class BaseMessage:
+    def __init__(self, *, message: str = None, delay: int = None, params: dict = None):
+        self.message = message
+        self.params = params or {}
+        self.delay = delay
+
+        self.id = uuid.uuid4()
 
     @classmethod
-    def extract_from_request_data(cls, data: MultiDictProxy, *, required: bool = True, default: dict = None) -> Message:
+    def extract_from_request_data(
+            cls,
+            data: Union[MultiDictProxy, dict],
+            *,
+            required: bool = True,
+            default: dict = None
+    ) -> BaseMessage:
         default = default or {}
-        result = {}
+        result = {
+            'message': data.get('message', default.get('message')),
+            'params': data.get('params', default.get('params', {})),
+            'delay': data.get('delay', default.get('delay', 0)),
+        }
 
-        for key in ['text', 'header', 'payload']:
-            result[key] = data.get(key, default.get(key))
-
-        if required and not any(result.values()):
+        if required and not result['message']:
             raise RequestParameterError('Message could not empty')
 
         return cls(**result)
 
     def __repr__(self):
-        payload_count = '' if self.payload is None else 'not '
-
-        return f'Message header: {self.header}, text: {self.text}, payload is {payload_count}empty'
+        return f'Message with id {self.id}'

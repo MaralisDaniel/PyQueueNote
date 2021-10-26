@@ -1,5 +1,10 @@
+from .exceptions import MProxyException, WorkerAwaitError, WorkerExecutionError
+from .model import BaseMessage
+from .queues import AIOQueue, QueueInterface
 from .server import Application
-from .queues import BaseQueue, AIOQueue
-from .workers import BaseWorker, BaseHTTPWorker, Stub, Telegram
-from .vchannel import VirtualChannel
-from .model import Message
+from .workers import BaseHTTPWorker, Telegram, WorkerInterface
+
+__all__ = [
+    'AIOQueue', 'Application', 'BaseHTTPWorker', 'BaseMessage', 'MProxyException', 'QueueInterface', 'Telegram',
+    'WorkerAwaitError', 'WorkerExecutionError', 'WorkerInterface',
+]

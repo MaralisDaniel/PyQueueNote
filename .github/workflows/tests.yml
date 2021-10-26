@@ -26,12 +26,8 @@ jobs:
         run: |
           python --version
           python -m pip install pip --upgrade
-          pip install pipenv --no-cache-dir
-          pipenv sync
+          pip install -r requirements-dev.txt --no-cache-dir
 
-      - name: Run tests in order units, functional, acceptance
+      - name: Run tests
         run: |
-          pipenv run python -m unittest tests.test_units
-          pipenv run python -m unittest tests.test_functional
-          pipenv run python -m unittest tests.test_acceptance
-
+          python -m pytest tests -vv --cov=mproxy --cov-report term
