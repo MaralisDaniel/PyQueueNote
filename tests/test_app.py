@@ -197,7 +197,7 @@ class TestMProxy(AioHTTPTestCase):
         )
         self.assertEqual(result.status, 200)
         self.assertEqual(await result.json(), {'status': 'success'})
-        await asyncio.sleep(6.5)
+        await asyncio.sleep(6.75)
         state = self.web_app.channels[STUB_CHANNEL_NAME].get_state()
         self.assertEqual(state['was_send'], 1)
         self.assertEqual(state['was_rejected'], 0)
