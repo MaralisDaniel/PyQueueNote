@@ -20,11 +20,11 @@ _Tip: config.yaml is git ignored file_
 
 Next run _main.py_ script with required args - you may learn them by running _main.py_ with _-h_ or _--help_ option:
 
-`python3 main.py` to run app
+`python3 m-proxy_server.py` to run app
 
-`python3 main.py -h` to view help on app
+`python3 m-proxy_server.py -h` to view help on app
 
-`python3 main.py --show_workers --show_queues` to view available workers and queues description and class names
+`python3 m-proxy_server.py --show_workers --show_queues` to view available workers and queues description and class names
 
 ### Docker image
 
