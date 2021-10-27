@@ -12,4 +12,4 @@ ENV PORT=8080
 
 RUN pip3 install --upgrade pip && pip3 install -r requirements.txt
 
-CMD ["sh", "-c", "python3 main.py -c=$CONFIG -H=$HOST -P=$PORT"]
+CMD ["sh", "-c", "python3 m-proxy_server.py -c=$CONFIG -H=$HOST -P=$PORT"]

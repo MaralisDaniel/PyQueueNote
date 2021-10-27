@@ -14,11 +14,11 @@ sync-n-test-cov:
 
 sync-n-run:
 	sync
-	@pipenv run main.py -c='config.yaml'
+	@pipenv run m-proxy_server.py -c='config.yaml'
 
 sync-n-run-debug:
 	sync
-	@pipenv run main.py -c='config.yaml' -d
+	@pipenv run m-proxy_server.py -c='config.yaml' -d
 
 setup:
 	@pip install --upgrade pip --no-cache-dir
@@ -38,15 +38,15 @@ setup-n-test-cov:
 
 setup-n-run-debug:
 	setup
-	@python3 main.py -c='config.yaml' -d
+	@python3 m-proxy_server.py -c='config.yaml' -d
 
 setup-n-run:
 	setup
-	@python3 main.py -c='config.yaml'
+	@python3 m-proxy_server.py -c='config.yaml'
 
 help:
-	@python3 main.py -h
+	@python3 m-proxy_server.py -h
 
 full-help:
-	@python3 main.py -h
-	@python3 main.py --show_queues --show_workers
+	@python3 m-proxy_server.py -h
+	@python3 m-proxy_server.py --show_queues --show_workers
