@@ -25,7 +25,7 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -dp 8888:8080 --env "HOST=0.0.0.0" --name mproxy --rm ${{ env.DOCKER_TAG }}
+          docker run -dp 8888:8080 --name mproxy --rm ${{ env.DOCKER_TAG }}
 
       - name: Ping container
         run: |
