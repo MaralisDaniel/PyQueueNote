@@ -7,7 +7,7 @@ From the box this service allows you to send simple messages to Telegram with he
 
 ### Build-in usage
 
-To run build-in server you should install all requirements (you are free to use pip or pipenv sync, it's also possible to run _make_ command with _setup_ argument):
+To run build-in server you should install all requirements (you are free to use pip or pipenv sync, it's also possible to run _make_ command, see makefile):
 
 `make setup` or `pip install -r requirements.txt` or `pipenv sync`
 
@@ -20,20 +20,20 @@ _Tip: config.yaml is git ignored file_
 
 Next run _main.py_ script with required args - you may learn them by running _main.py_ with _-h_ or _--help_ option:
 
-`python3 m-proxy_server.py` to run app
+`mproxy_server.py` to run app
 
-`python3 m-proxy_server.py -h` to view help on app
+`mproxy_server.py -h` to view help on app
 
-`python3 m-proxy_server.py --show_workers --show_queues` to view available workers and queues description and class names
+`mproxy_server.py --show_workers --show_queues` to view available workers and queues description and class names
 
 ### Docker image
 
 M-proxy contains Dockerfile - you can build it and run image. There are 3 env args are available:
 - **CONFIG**: config filename, default value - _config.example.yaml_
-- **HOST**: ip or domain name to listen for incoming messages, default value - _127.0.0.1_
-- **PORT**: port to listen on selected ip or domain name, default value - _8080_
 
-_Tip: running docker container with 127.0.0.1 will not allow you to connect to m-proxy from net - you should specify this param to use service (in simple way pass 0.0.0.0, but remember - this is insecure)_
+In case if you are using ready container from repository you can bind any suitable config file and pass route as CONFIG env param, for example:
+
+`docker run -e CONFIG='/var/mproxy/config.yaml' -dp 8080:8080 --mount='type=bind,source=/some/path/config.yaml,target=/var/mproxy/config.yaml' m-proxy`
 
 ## HTTP-Api
 

@@ -56,8 +56,6 @@ class Application:
         self._log.debug('App terminated')
 
     async def send_message(self, request: web.Request) -> web.Response:
-        if self.app[Application.MAINTENANCE_KEY]:
-            raise TemporaryUnawailableError('Service is temporary unawailable')
         channel = request.match_info.get('v_channel')
         v_channel = self.channels.get(channel)
         if v_channel is None:
@@ -70,13 +68,9 @@ class Application:
         return web.json_response({'status': 'success'})
 
     async def ping(self, request: web.Request) -> web.Response:
-        if self.app[self.MAINTENANCE_KEY]:
-            return web.Response(status=503, text='FAIL', headers={'Retry-After': str(self.retry_after)})
         return web.Response(text='OK')
 
     async def get_channel_stat(self, request: web.Request) -> web.Response:
-        if self.app[Application.MAINTENANCE_KEY]:
-            raise TemporaryUnawailableError('Service is temporary unawailable')
         channel = request.match_info.get('v_channel')
         v_channel = self.channels.get(channel)
         if v_channel is None:
@@ -87,6 +81,12 @@ class Application:
     @web.middleware
     async def handle_errors_middleware(self, request: web.Request, handler: typing.Callable) -> web.Response:
         try:
+            if self.app[Application.MAINTENANCE_KEY]:
+                return web.json_response(
+                        {'status': 'error', 'error': 'Service is temporary unawailable'},
+                        status=503,
+                        headers={'Retry-After': str(self.retry_after)}
+                )
             return await handler(request)
         except RequestParameterError as e:
             return web.json_response({'status': 'error', 'error': str(e)}, status=422)

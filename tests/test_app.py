@@ -351,7 +351,7 @@ class TestMProxy(AioHTTPTestCase):
     async def test_can_ping_in_maintenance_mode(self) -> None:
         result = await self.client.request('GET', '/api/ping')
         self.assertEqual(result.status, 503)
-        self.assertEqual(await result.text(), 'FAIL')
+        self.assertEqual(await result.json(), {'status': 'error', 'error': 'Service is temporary unawailable'})
 
     def check_request_count(self, requests: dict, unique_url_count: int = 1, request_per_url_count: int = 1) -> None:
         self.assertEqual(len(requests), unique_url_count)
@@ -359,7 +359,7 @@ class TestMProxy(AioHTTPTestCase):
             self.assertEqual(len(request_per_url), request_per_url_count)
 
     def check_request_calls(self, requests: dict, data: dict, url_key: tuple = None, call_key: int = 0) -> None:
-        request_calls = requests.get(url_key) if url_key else next(iter(requests.values()), None)  # type: Union[None, list[RequestCall]]
+        request_calls = requests.get(url_key) if url_key else None  # type: Union[None, list[RequestCall]]
         self.assertIsNotNone(request_calls)
         self.assertDictEqual(request_calls[call_key].kwargs, data)
 

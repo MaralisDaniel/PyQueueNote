@@ -8,6 +8,7 @@ import typing
 from datetime import datetime, timezone
 
 import tenacity
+from aiohttp import web
 
 from .exceptions import RequestExecutionError, WorkerAwaitError, WorkerExecutionError
 from .model import BaseMessage
@@ -95,7 +96,7 @@ class VirtualChannel:
     def add_message(self, message: BaseMessage) -> None:
         self._queue.add_task(message)
 
-    async def activate(self, app) -> None:
+    async def activate(self, app: web.Application) -> None:
         if self._task is not None and not self._task.done():
             raise RequestExecutionError('Virtual channel already is running')
         self._log.info('Activating %s virtual channel', self._name)
@@ -104,7 +105,7 @@ class VirtualChannel:
         self._messages_rejected = 0
         self._last_error = None
 
-    async def deactivate(self, app) -> None:
+    async def deactivate(self, app: web.Application) -> None:
         if self._task is None:
             return
         self._log.info('Deactivating %s virtual channel', self._name)
@@ -120,6 +121,7 @@ class VirtualChannel:
         )
         async def execute(worker: WorkerType, message: BaseMessage):
             await worker.operate(message)
+
         async with self._worker.prepare() as charged_worker:
             while True:
                 try:
@@ -178,5 +180,8 @@ class VirtualChannel:
         return self._task is not None and not self._task.done()
 
     def __repr__(self) -> str:
-        state = 'idle' if self._task is None or self._task.done() else 'running'
+        if self._task is None or self._task.done():
+            state = 'stopped'
+        else:
+            state = 'running' if self._queue.current_items_count() else 'ready'
         return f'Virtual channel {self._name}, state {state}'

@@ -67,7 +67,7 @@ class Telegram(BaseHTTPWorker):
     async def operate(self, message: BaseMessage) -> None:
         response = await self.execute_query({'text': message.message, **message.params, **self._data})
         result = response['data'] if isinstance(response['data'], dict) else {'origin': response['data']}
-        if result.get('ok', False):
+        if result.get('ok'):
             self._log.info('Channel %s accepted the message, its id: %d', self.channel, response['data']['result']['message_id'])
             return
         reason = result.get('description', f"Not specified, code: {response['status']}")

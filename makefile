@@ -14,11 +14,11 @@ sync-n-test-cov:
 
 sync-n-run:
 	sync
-	@pipenv run m-proxy_server.py -c='config.yaml'
+	@pipenv run mproxy_server.py -c='config.yaml'
 
 sync-n-run-debug:
 	sync
-	@pipenv run m-proxy_server.py -c='config.yaml' -d
+	@pipenv run mproxy_server.py -c='config.yaml' -d
 
 setup:
 	@pip install --upgrade pip --no-cache-dir
@@ -34,19 +34,19 @@ setup-n-test:
 
 setup-n-test-cov:
 	setup-dev
-	@python3 -m pytest tests -vv --cov=mproxy --cov-report term
+	@python3 -m pytest tests -vv --cov=mproxy --cov-report html
 
 setup-n-run-debug:
 	setup
-	@python3 m-proxy_server.py -c='config.yaml' -d
+	@mproxy_server.py -c='config.yaml' -d
 
 setup-n-run:
 	setup
-	@python3 m-proxy_server.py -c='config.yaml'
+	@mproxy_server.py -c='config.yaml'
 
 help:
-	@python3 m-proxy_server.py -h
+	@mproxy_server.py -h
 
 full-help:
-	@python3 m-proxy_server.py -h
-	@python3 m-proxy_server.py --show_queues --show_workers
+	@mproxy_server.py -h
+	@mproxy_server.py --show_queues --show_workers
