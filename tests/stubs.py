@@ -5,7 +5,7 @@ import contextlib
 import logging
 import random
 import uuid
-from typing import Union
+from typing import AsyncGenerator, Union
 
 import mproxy
 
@@ -51,7 +51,7 @@ class Stub:
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
     @contextlib.asynccontextmanager
-    async def prepare(self) -> Stub:
+    async def prepare(self) -> AsyncGenerator[Stub, None]:
         yield self
 
     async def operate(self, message: mproxy.BaseMessage) -> None:

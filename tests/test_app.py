@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import logging
 import random
-from typing import Union
 import unittest
 import unittest.mock
 import uuid
 from collections import namedtuple
+from typing import Union
 
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 from aiohttp.web import Application

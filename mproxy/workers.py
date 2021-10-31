@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import AsyncGenerator
 
 import aiohttp
 
@@ -30,7 +31,7 @@ class BaseHTTPWorker:
         raise NotImplementedError()
 
     @contextlib.asynccontextmanager
-    async def prepare(self) -> BaseHTTPWorker:
+    async def prepare(self) -> AsyncGenerator[BaseHTTPWorker, None]:
         async with aiohttp.ClientSession(timeout=self._timeout) as session:
             self._session = session
             yield self

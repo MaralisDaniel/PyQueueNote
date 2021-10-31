@@ -42,7 +42,7 @@ def get_delay_in_seconds(delay: typing.Union[str, int, float]) -> int:
 
 
 class WaitExponentialOrByRetryAfterValue(tenacity.wait.wait_base):
-    def __init__(self, starts: int, ends: int, base: int = 4) -> None:
+    def __init__(self, starts: typing.Union[int, float], ends: typing.Union[int, float], base: typing.Union[int, float] = 4) -> None:
         self._starts = starts
         self._ends = ends
         self._base = base
@@ -75,7 +75,7 @@ class VirtualChannel:
             queue: QueueType,
             min_delay: typing.Union[int, float],
             max_delay: typing.Union[int, float],
-            retry_attempts: typing.Union[int, float],
+            retry_attempts: int,
             retry_base: typing.Union[int, float],
             logger: logging.Logger = None,
     ) -> None:
@@ -89,7 +89,7 @@ class VirtualChannel:
         self._task = None  # type: typing.Union[None, asyncio.Task]
         self._messages_send = 0
         self._messages_rejected = 0
-        self._last_error = None
+        self._last_error = None  # type: typing.Union[None, dict[str, str]]
         self._log_type = logger
         self._log = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
 
@@ -122,7 +122,7 @@ class VirtualChannel:
         async def execute(worker: WorkerType, message: BaseMessage):
             await worker.operate(message)
 
-        async with self._worker.prepare() as charged_worker:
+        async with self._worker.prepare() as charged_worker:  # type: WorkerType
             while True:
                 try:
                     task = await self._queue.get_task()

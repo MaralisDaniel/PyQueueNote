@@ -24,7 +24,7 @@ class Application:
             config: dict,
             debug: bool,
             retry_after: int = DEFAULT_RETRY_AFTER,
-            logger: logging.Logger = None
+            logger: logging.Logger = None,
     ) -> None:
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, format='%(asctime)s - %(levelname)s, %(name)s: %(message)s')
         self._log_type = logger
@@ -85,7 +85,7 @@ class Application:
                 return web.json_response(
                         {'status': 'error', 'error': 'Service is temporary unawailable'},
                         status=503,
-                        headers={'Retry-After': str(self.retry_after)}
+                        headers={'Retry-After': str(self.retry_after)},
                 )
             return await handler(request)
         except RequestParameterError as e:
