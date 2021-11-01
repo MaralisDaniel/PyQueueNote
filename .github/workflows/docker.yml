@@ -25,7 +25,7 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -dp8080:8080 --name=mproxy ${{ env.DOCKER_TAG }} -rm
+         docker run -dp8080:8080 --name=mproxy --rm ${{ env.DOCKER_TAG }}
 
       - name: Check container
         run: |
