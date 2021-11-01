@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DOCKER_TAG: "mproxy"
+      DOCKER_TAG: "mproxy:latest"
 
     steps:
       - name: Chekout to branch
@@ -25,7 +25,7 @@ jobs:
 
       - name: Start container
         run: |
-         docker run -dp8080:8080 --name=mproxy --rm ${{ env.DOCKER_TAG }}
+          docker run -dp8080:8080 --name=mproxy ${{ env.DOCKER_TAG }}
 
       - name: Check container
         run: |
