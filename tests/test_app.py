@@ -8,7 +8,7 @@ import uuid
 from collections import namedtuple
 from typing import Union
 
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+from aiohttp.test_utils import AioHTTPTestCase
 from aiohttp.web import Application
 from aioresponses import aioresponses
 from yarl import URL
@@ -93,6 +93,8 @@ class TestMProxy(AioHTTPTestCase):
         return self.web_app.app
 
     async def setUpAsync(self) -> None:
+        await super().setUpAsync()
+
         self.telegram_response = {
             'ok': True,
             'result': {
@@ -105,13 +107,11 @@ class TestMProxy(AioHTTPTestCase):
         }
         self.url = f'{HOST}bot{self.bot_id}/sendMessage'
 
-    @unittest_run_loop
     async def test_can_ping_in_normal_conditions(self) -> None:
         result = await self.client.request('GET', '/api/ping')
         self.assertEqual(result.status, 200)
         self.assertEqual(await result.text(), 'OK')
 
-    @unittest_run_loop
     async def test_can_send_message_in_normal_conditions(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(self.url, status=200, payload=self.telegram_response, headers={'Content-Type': 'application/json'})
@@ -130,7 +130,6 @@ class TestMProxy(AioHTTPTestCase):
                 url_key=('POST', URL(self.url)),
         )
 
-    @unittest_run_loop
     async def test_can_send_few_messages_in_normal_conditions(self) -> None:
         expected_calls = []
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
@@ -150,7 +149,6 @@ class TestMProxy(AioHTTPTestCase):
         for call in range(0, self.FEW_MESSAGES_COUNT):
             self.check_request_calls(mock.requests, expected_calls[call], url_key=('POST', URL(self.url)), call_key=call)
 
-    @unittest_run_loop
     async def test_can_retry_to_send_message_with_delay(self) -> None:
         delay = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(0, 1)).strftime('%a, %d %b %Y %H:%M:%S %Z')
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
@@ -170,7 +168,6 @@ class TestMProxy(AioHTTPTestCase):
         self.check_request_calls(mock.requests, req, url_key=('POST', URL(self.url)), call_key=0)
         self.check_request_calls(mock.requests, req, url_key=('POST', URL(self.url)), call_key=1)
 
-    @unittest_run_loop
     async def test_can_reject_send_message_after_numbers_of_attempts(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             for _ in range(0, self.RETRY_ATTEMPTS):
@@ -188,7 +185,6 @@ class TestMProxy(AioHTTPTestCase):
         self.check_request_calls(mock.requests, req, url_key=('POST', URL(self.url)), call_key=0)
         self.check_request_calls(mock.requests, req, url_key=('POST', URL(self.url)), call_key=1)
 
-    @unittest_run_loop
     async def test_can_retry_with_exponential_delay(self) -> None:
         result = await self.client.request(
                 'POST',
@@ -208,7 +204,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertAlmostEqual((first_delay.seconds + first_delay.microseconds / 1000000), 2.5, self.ROUND_TO)
         self.assertAlmostEqual((second_delay.seconds + second_delay.microseconds / 1000000), 3.25, self.ROUND_TO)
 
-    @unittest_run_loop
     async def test_can_show_channel_stat(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             for _ in range(0, self.FEW_MESSAGES_COUNT):
@@ -225,7 +220,6 @@ class TestMProxy(AioHTTPTestCase):
                 {'channel_stat': {'was_send': self.FEW_MESSAGES_COUNT, 'was_rejected': 0, 'in_queue': 0}, 'is_running': True, 'last_error': None},
         )
 
-    @unittest_run_loop
     async def test_can_handle_undeliverable_message(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(self.url, status=400, payload={'ok': False, 'description': 'Test failure'}, headers={'Content-Type': 'application/json'})
@@ -247,7 +241,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(channel_state['was_send'], 0)
         self.assertEqual(channel_state['was_rejected'], 1)
 
-    @unittest_run_loop
     async def test_can_handle_unreachable_url(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as m:
             m.post(self.url, status=404)
@@ -269,7 +262,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(channel_state['was_send'], 0)
         self.assertEqual(channel_state['was_rejected'], 1)
 
-    @unittest_run_loop
     async def test_can_reject_empty_message(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(self.url, status=200, payload=self.telegram_response, headers={'Content-Type': 'application/json'})
@@ -279,7 +271,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(await result.json(), {'status': 'error', 'error': 'Message could not empty'})
         self.assertDictEqual(mock.requests, {})
 
-    @unittest_run_loop
     async def test_can_reject_send_message_in_inactive_channel(self) -> None:
         await self.web_app.channels[TEST_CHANNEL_NAME].deactivate(self.web_app.app)
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
@@ -294,7 +285,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(await result.json(), {'status': 'error', 'error': 'Channel is not available for now'})
         self.assertDictEqual(mock.requests, {})
 
-    @unittest_run_loop
     async def test_can_reject_send_message_non_exists_channel(self) -> None:
         channel = 'some_channel'
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
@@ -309,14 +299,12 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(await result.json(), {'status': 'error', 'error': f'Unknown channel {channel}'})
         self.assertDictEqual(mock.requests, {})
 
-    @unittest_run_loop
     async def test_can_reject_to_send_message_with_full_queue(self) -> None:
         for _ in range(0, self.FEW_MESSAGES_COUNT):
             result = await self.client.request('POST', f'/api/send/{STUB_CHANNEL_NAME}', json={'message': self.MESSAGE})
         self.assertEqual(result.status, 503)
         self.assertEqual(await result.json(), {'status': 'error', 'error': 'Queue of this channel is full. Try again later'})
 
-    @unittest_run_loop
     async def test_can_reject_show_channel_stat_of_non_exists_channel(self) -> None:
         channel = 'some_channel'
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
@@ -327,7 +315,6 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(await result.json(), {'status': 'error', 'error': f'Unknown channel {channel}'})
         self.assertDictEqual(mock.requests, {})
 
-    @unittest_run_loop
     async def test_can_reject_to_send_message_in_maintenance_mode(self) -> None:
         with aioresponses(passthrough=IGNORE_HOSTS) as mock:
             mock.post(self.url, status=200, payload=self.telegram_response, headers={'Content-Type': 'application/json'})
@@ -341,13 +328,11 @@ class TestMProxy(AioHTTPTestCase):
         self.assertEqual(await result.json(), {'status': 'error', 'error': 'Service is temporary unawailable'})
         self.assertDictEqual(mock.requests, {})
 
-    @unittest_run_loop
     async def test_can_reject_to_show_channel_stat_in_maintenance_mode(self) -> None:
         result = await self.client.request('GET', f'/api/stat/{TEST_CHANNEL_NAME}')
         self.assertEqual(result.status, 503)
         self.assertEqual(await result.json(), {'status': 'error', 'error': 'Service is temporary unawailable'})
 
-    @unittest_run_loop
     async def test_can_ping_in_maintenance_mode(self) -> None:
         result = await self.client.request('GET', '/api/ping')
         self.assertEqual(result.status, 503)
@@ -361,7 +346,8 @@ class TestMProxy(AioHTTPTestCase):
     def check_request_calls(self, requests: dict, data: dict, url_key: tuple = None, call_key: int = 0) -> None:
         request_calls = requests.get(url_key) if url_key else None  # type: Union[None, list[RequestCall]]
         self.assertIsNotNone(request_calls)
-        self.assertDictEqual(request_calls[call_key].kwargs, data)
+        if request_calls:
+            self.assertDictEqual(request_calls[call_key].kwargs, data)
 
 
 if __name__ == '__main__':

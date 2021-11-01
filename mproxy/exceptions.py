@@ -18,8 +18,7 @@ class TemporaryUnawailableError(MProxyException):
 
 
 class WorkerAwaitError(MProxyException):
-    def __init__(self, state: int, reason: str, *args, delay: Union[str, int, float] = None, **kwargs):
-        super().__init__(args, kwargs)
+    def __init__(self, state: int, reason: str, delay: Union[str, int, float] = None):
         self._state = state
         self._reason = reason
         self.delay = delay
@@ -29,8 +28,7 @@ class WorkerAwaitError(MProxyException):
 
 
 class WorkerExecutionError(MProxyException):
-    def __init__(self, state: int, reason: str, *args, **kwargs):
-        super().__init__(args, kwargs)
+    def __init__(self, state: int, reason: str):
         self._state = state
         self._reason = reason
 

@@ -73,10 +73,10 @@ class VirtualChannel:
             self, name: str,
             worker: WorkerType,
             queue: QueueType,
-            min_delay: typing.Union[int, float],
-            max_delay: typing.Union[int, float],
-            retry_attempts: int,
-            retry_base: typing.Union[int, float],
+            min_delay: typing.Union[int, float] = MIN_RETRY_AFTER,
+            max_delay: typing.Union[int, float] = MAX_RETRY_AFTER,
+            retry_attempts: int = RETRY_ATTEMPTS,
+            retry_base: typing.Union[int, float] = RETRY_BASE,
             logger: logging.Logger = None,
     ) -> None:
         self._min_retry_after = min_delay
@@ -96,7 +96,7 @@ class VirtualChannel:
     def add_message(self, message: BaseMessage) -> None:
         self._queue.add_task(message)
 
-    async def activate(self, app: web.Application) -> None:
+    async def activate(self, app: web.Application = None) -> None:
         if self._task is not None and not self._task.done():
             raise RequestExecutionError('Virtual channel already is running')
         self._log.info('Activating %s virtual channel', self._name)
@@ -105,7 +105,7 @@ class VirtualChannel:
         self._messages_rejected = 0
         self._last_error = None
 
-    async def deactivate(self, app: web.Application) -> None:
+    async def deactivate(self, app: web.Application = None) -> None:
         if self._task is None:
             return
         self._log.info('Deactivating %s virtual channel', self._name)

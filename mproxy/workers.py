@@ -17,7 +17,7 @@ DEFAULT_LOGGER_NAME = 'm-proxy.worker'
 class WorkerType:
     async def operate(self, message: BaseMessage) -> None: ...
     @contextlib.asynccontextmanager
-    async def prepare(self) -> WorkerType: ...
+    async def prepare(self) -> AsyncGenerator[WorkerType, None]: ...
 
 
 class BaseHTTPWorker:
@@ -38,13 +38,15 @@ class BaseHTTPWorker:
             self._session = None
 
     async def execute_query(self, data: dict = None) -> dict:
-        async with self._session.request(self._method, self._url, data=data) as response:
-            result = {'status': response.status, 'retry-after': response.headers.get('Retry-After')}
-            if response.content_type == 'application/json':
-                result['data'] = await response.json()
+        if self._session:
+            async with self._session.request(self._method, self._url, data=data) as response:
+                result = {'status': response.status, 'retry-after': response.headers.get('Retry-After')}
+                if response.content_type == 'application/json':
+                    result['data'] = await response.json()
+                    return result
+                result['data'] = await response.text()
                 return result
-            result['data'] = await response.text()
-            return result
+        raise RuntimeError('Client session is not prepared')
 
 
 # Default workers

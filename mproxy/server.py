@@ -38,6 +38,9 @@ class Application:
         self.config = config
         self.channels = {}  # type: dict[str, VirtualChannel]
         self.app[self.MAINTENANCE_KEY] = True
+        self.app.on_startup.append(self.prepare_app)
+
+    async def prepare_app(self, app: web.Application = None):
         self.app.middlewares.append(self.handle_errors_middleware)
         self.app.router.add_route('GET', '/api/ping', self.ping)
         self.app.router.add_route('POST', r'/api/send/{v_channel:[\w\-]{4,24}}', self.send_message)
@@ -45,7 +48,7 @@ class Application:
         for name, channel_config in self.config.items():
             self._log.debug('Registering channel %s', name)
             self.channels[name] = VirtualChannel.create_from_config(name, channel_config, self._components, logger=self._log_type)
-            self.app.on_startup.append(self.channels[name].activate)
+            await self.channels[name].activate()
             self.app.on_shutdown.append(self.channels[name].deactivate)
 
     def run(self) -> None:

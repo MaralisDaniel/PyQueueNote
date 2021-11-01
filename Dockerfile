@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /srv/mproxy_app
 
-COPY . .
+COPY . /srv/mproxy_app
 
 EXPOSE 8080
 
