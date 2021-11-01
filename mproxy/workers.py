@@ -17,7 +17,7 @@ DEFAULT_LOGGER_NAME = 'm-proxy.worker'
 class WorkerType:
     async def operate(self, message: BaseMessage) -> None: ...
     @contextlib.asynccontextmanager
-    async def prepare(self) -> AsyncGenerator[WorkerType, None]: ...
+    async def prepare(self) -> AsyncGenerator[WorkerType, None]: yield self
 
 
 class BaseHTTPWorker:
