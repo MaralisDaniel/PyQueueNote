@@ -25,12 +25,16 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -dp 8888:8080 --name mproxy --rm ${{ env.DOCKER_TAG }}
+          docker run -dp 8080:8080 --name mproxy --rm ${{ env.DOCKER_TAG }}
+
+      - name: Start container
+        run: |
+          sleep 5
+          docker logs ${{ env.DOCKER_TAG }}
 
       - name: Ping container
         run: |
-          sleep 5
-          curl -v "http://localhost:8888/api/ping"
+          curl -v "http://localhost:8080/api/ping"
 
       - name: Stop container
         if: true

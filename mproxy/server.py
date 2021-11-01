@@ -52,7 +52,6 @@ class Application:
             self.app.on_shutdown.append(self.channels[name].deactivate)
 
     def run(self) -> None:
-        self._log.debug('Starting app')
         self.app[self.MAINTENANCE_KEY] = False
         self._log.debug('Run web app at %s:%d', self.host, self.port)
         web.run_app(self.app, host=self.host, port=self.port)
