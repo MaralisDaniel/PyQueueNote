@@ -30,6 +30,7 @@ jobs:
       - name: Start container
         run: |
           sleep 5
+          docker ls
           docker logs ${{ env.DOCKER_TAG }}
 
       - name: Ping container
