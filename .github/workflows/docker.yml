@@ -30,7 +30,8 @@ jobs:
       - name: Check container
         run: |
           sleep 3
-          docker container ls
+          docker images
+          docker container ls -a
           docker logs $(docker container ls -lq | tr -d \n)
 
       - name: Ping container
