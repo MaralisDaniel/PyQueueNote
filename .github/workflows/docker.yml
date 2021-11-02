@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DOCKER_TAG: "mproxy"
+      DOCKER_TAG: "mproxy:latest"
 
     steps:
       - name: Chekout to branch
@@ -25,12 +25,18 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -dp 8888:8080 --env "HOST=0.0.0.0" --name mproxy --rm ${{ env.DOCKER_TAG }}
+          docker run -dp8080:8080 --name=mproxy --rm ${{ env.DOCKER_TAG }}
+
+      - name: Check container
+        run: |
+          sleep 3
+          docker images
+          docker container ls
+          docker logs $(docker container ls -lq | tr -d \n)
 
       - name: Ping container
         run: |
-          sleep 5
-          curl -v "http://localhost:8888/api/ping"
+          curl -v "http://localhost:8080/api/ping"
 
       - name: Stop container
         if: true
