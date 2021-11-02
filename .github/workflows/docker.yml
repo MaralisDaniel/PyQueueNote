@@ -25,13 +25,13 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -dp8080:8080 --name=mproxy -u 0 ${{ env.DOCKER_TAG }}
+          docker run -dp8080:8080 --name=mproxy -rm ${{ env.DOCKER_TAG }}
 
       - name: Check container
         run: |
           sleep 3
           docker images
-          docker container ls -a
+          docker container ls
           docker logs $(docker container ls -lq | tr -d \n)
 
       - name: Ping container
